@@ -258,6 +258,7 @@ footer.foot{margin-top:36px;font-size:.8125rem;color:var(--muted);display:grid;g
 (() => {
 'use strict';
 const $ = (s, el = document) => el.querySelector(s);
+const md = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/^\s*[-*] /gm, '• ');
 const safeUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '#';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -663,7 +664,7 @@ function askHTML() {
   const sugg = ['¿Qué tenemos esta semana?', `Cita de ${S.miembros[S.miembros.length - 1] ? first(S.miembros[S.miembros.length - 1]) : 'mi mamá'} el jueves a las 3 pm con cardiología`, '¿Qué autorizaciones se vencen pronto?', 'Control de pediatría en 3 meses'];
   return `<div class="ask" id="askWrap"><form id="askForm" autocomplete="off"><span class="spark">${ic('spark')}</span><label class="sr" for="askIn">Escribe lo que necesitas</label><input id="askIn" placeholder="Escribe o dicta: “cita de mi papá mañana 7 am…”" enterkeyhint="send"><button type="submit" aria-label="Enviar">${ic('send')}</button></form></div>
   <div class="suggest">${sugg.map(s => `<button data-sugg="${esc(s)}">${esc(s)}</button>`).join('')}</div>
-  ${answer ? `<div class="answer"><div class="row"><b>${ic('spark')} Asistente</b><button class="btn ghost sm" data-act="close-answer">Cerrar</button></div><p>${esc(answer)}</p></div>` : ''}`;
+  ${answer ? `<div class="answer"><div class="row"><b>${ic('spark')} Asistente</b><button class="btn ghost sm" data-act="close-answer">Cerrar</button></div><p>${md(answer)}</p></div>` : ''}`;
 }
 
 function inicioHTML() {
@@ -1203,7 +1204,7 @@ async function askHelp(q) {
   const local = () => { const best = FAQ.map((f, i) => [score(f), i]).sort((a, b) => b[0] - a[0])[0]; if (best && best[0] > 0) { out.textContent = FAQ[best[1]][1]; const d = document.querySelector(`[data-faq="${best[1]}"]`); if (d) d.open = true; } else out.textContent = `No encontré una respuesta. Escríbenos a ${PAGO.correo}.`; };
   if (mode !== 'netlify') { local(); return; }
   out.textContent = 'Pensando…';
-  try { const r = await aiCall({ mode: 'ayuda', q }); out.textContent = r.texto || ''; } catch (_) { local(); }
+  try { const r = await aiCall({ mode: 'ayuda', q }); out.innerHTML = md(r.texto || ''); } catch (_) { local(); }
 }
 document.addEventListener('click', e => { if (e.target.closest('[data-copy-mail]')) copyText(PAGO.correo); });
 
