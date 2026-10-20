@@ -419,7 +419,9 @@ async function refreshCloud(force) {
   try {
     const r = await fetch('/api/data', { credentials: 'same-origin' }); if (!r.ok) return; const j = await r.json(); lastFetch = Date.now();
     if (j.pendingInvite) return;
+    const sig = JSON.stringify([acct, famInfo, rol, invitacion]);
     acct = j.cuenta; famInfo = j.familia; rol = j.rol || rol; invitacion = j.invitacion;
+    if (sig !== JSON.stringify([acct, famInfo, rol, invitacion])) { setStatus(); render(); }
     if (j.agenda && Number(j.agenda.version || 0) !== Number(S.version || 0)) {
       const next = isDirty() ? merge3(baseSnap, S, j.agenda) : clone(j.agenda);
       next.version = j.agenda.version; baseSnap = clone(j.agenda); S = Object.assign(emptyState(), next); render();
@@ -793,7 +795,7 @@ function bind(app) {
   app.querySelectorAll('[data-sol]').forEach(b => b.onclick = () => openSol(b.dataset.sol));
   $('#restoreIn')?.addEventListener('change', e => importData(e.target.files[0]));
   app.querySelectorAll('[data-del-ctl]').forEach(b => b.onclick = () => removeWithUndo('controles', b.dataset.delCtl, 'Control quitado'));
-  app.querySelectorAll('[data-sugg]').forEach(b => b.onclick = () => { $('#askIn').value = b.dataset.sugg; $('#askIn').focus(); });
+  app.querySelectorAll('[data-sugg]').forEach(b => b.onclick = () => { const i = $('#askIn'); i.value = b.dataset.sugg; if (i.form && i.form.requestSubmit) i.form.requestSubmit(); else i.focus(); });
   $('#askForm')?.addEventListener('submit', e => { e.preventDefault(); ask($('#askIn').value.trim()); });
   $('#helpForm')?.addEventListener('submit', e => { e.preventDefault(); askHelp($('#helpIn').value.trim()); });
   app.querySelectorAll('[data-faq-go]').forEach(b => b.onclick = () => ({ familia: () => go('familia'), plus: () => openPlus(), calendar: () => (mode === 'netlify' ? openCalendar() : go('familia')), install: () => openInstall(), plan: () => openPlan() })[b.dataset.faqGo]?.());
@@ -1248,18 +1250,41 @@ async function doLogout() {
 async function openAdmin() {
   openDialog(`${head('Administración')}<p class="muted" style="margin:0">Cargando clientes…</p>`);
   let j; try { const r = await fetch('/api/admin', { credentials: 'same-origin' }); j = await r.json(); if (!r.ok) throw new Error(j.error); } catch (e) { openDialog(`${head('Administración')}<p style="margin:0">${esc(e.message || 'No se pudo cargar.')}</p>`); return; }
-  const draw = (filt = '') => openDialog(`${head('Administración')}
-    <div class="feat" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div><b>${j.total}</b><span class="small muted">cuentas</span></div><div><b>${j.prueba}</b><span class="small muted">en prueba</span></div><div><b>${j.pagos}</b><span class="small muted">pagando</span></div></div>
-    <label class="f">Buscar por correo<input id="ad-q" value="${esc(filt)}" inputmode="email"></label>
-    <div style="display:grid;gap:8px">${j.cuentas.filter(c => !filt || (c.email || '').toLowerCase().includes(filt.toLowerCase())).slice(0, 80).map(c => `<div class="card" style="gap:8px"><div class="row"><span class="grow"><b style="overflow-wrap:anywhere">${esc(c.email || c.userId)}</b><br><span class="small muted">Creada ${fmtDate(c.creada.slice(0, 10))}${c.notas ? ' · ' + esc(c.notas) : ''}</span></span><span class="badge ${c.plan === 'pago' ? 'good' : c.plan === 'prueba' ? 'accent' : 'crit'}">${c.plan === 'pago' ? 'Pago hasta ' + fmtDate(String(c.hasta).slice(0, 10)) : c.plan === 'prueba' ? 'Prueba · ' + c.dias + ' d' : 'Vencido'}</span></div>
-      <div class="chips"><button class="btn sm primary" data-ad="mes" data-u="${esc(c.userId)}">+1 mes</button><button class="btn sm" data-ad="anio" data-u="${esc(c.userId)}">+1 año</button><button class="btn sm" data-ad="prueba7" data-u="${esc(c.userId)}">+7 días prueba</button>${c.plan === 'pago' ? `<button class="btn sm danger" data-ad="quitar" data-u="${esc(c.userId)}">Quitar plan</button>` : ''}</div></div>`).join('') || '<span class="muted">Sin resultados.</span>'}</div>`, r => {
-    const q = r.querySelector('#ad-q'); q.oninput = () => { clearTimeout(q._t); q._t = setTimeout(() => { draw(q.value.trim()); setTimeout(() => { const n = $('#ad-q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 0); }, 300); };
-    r.querySelectorAll('[data-ad]').forEach(b => b.onclick = async () => {
-      b.disabled = true;
-      try { const res = await fetch('/api/admin', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId: b.dataset.u, accion: b.dataset.ad }) }); const k = await res.json(); if (!res.ok) throw new Error(k.error); const i = j.cuentas.findIndex(c => c.userId === b.dataset.u); j.cuentas[i] = Object.assign(j.cuentas[i], k.cuenta); j.pagos = j.cuentas.filter(c => c.plan === 'pago').length; j.prueba = j.cuentas.filter(c => c.plan === 'prueba').length; toast('Listo'); draw(q.value.trim()); } catch (e) { toast(e.message || 'No se pudo'); b.disabled = false; }
+  const ACC = { mes: 'Sumar 1 mes pagado', anio: 'Sumar 1 año pagado', prueba7: 'Dar 7 días más de prueba', quitar: 'Quitar el plan pagado' };
+  const estado = c => c.plan === 'pago' ? `Pagado hasta el ${fmtDate(String(c.hasta).slice(0, 10))} (${c.dias} días)` : c.plan === 'prueba' ? `Prueba gratis: quedan ${c.dias} días (hasta ${fmtDate(String(c.hasta).slice(0, 10))})` : 'Vencido: no puede guardar cambios';
+  const last = {}; let filt = '';
+  const card = c => `<div class="card" style="gap:8px${last[c.userId] ? ';border-color:var(--good)' : ''}" id="adc-${esc(c.userId)}"><div class="row"><span class="grow"><b style="overflow-wrap:anywhere">${esc(c.email || c.userId)}</b><br><span class="small muted">Cuenta creada el ${fmtDate(c.creada.slice(0, 10))}</span></span><span class="badge ${c.plan === 'pago' ? 'good' : c.plan === 'prueba' ? 'accent' : 'crit'}">${c.plan === 'pago' ? 'Pagando' : c.plan === 'prueba' ? 'Prueba' : 'Vencido'}</span></div>
+      <span class="small"><b>${esc(estado(c))}</b></span>
+      ${last[c.userId] ? `<div class="notice" style="margin:0"><span>✓ ${esc(last[c.userId].msg)}</span><button class="btn sm" data-undo="${esc(c.userId)}">Deshacer</button></div>` : ''}
+      <div class="chips"><button class="btn sm primary" data-ad="mes" data-u="${esc(c.userId)}">+1 mes</button><button class="btn sm" data-ad="anio" data-u="${esc(c.userId)}">+1 año</button><button class="btn sm" data-ad="prueba7" data-u="${esc(c.userId)}">+7 días de prueba</button>${c.plan === 'pago' ? `<button class="btn sm danger" data-ad="quitar" data-u="${esc(c.userId)}">Quitar plan</button>` : ''}</div></div>`;
+  const list = () => j.cuentas.filter(c => !filt || (c.email || '').toLowerCase().includes(filt.toLowerCase())).slice(0, 80).map(card).join('') || '<span class="muted">Sin resultados.</span>';
+  const stats = () => `<div><b>${j.total}</b><span class="small muted">cuentas</span></div><div><b>${j.prueba}</b><span class="small muted">en prueba</span></div><div><b>${j.pagos}</b><span class="small muted">pagando</span></div>`;
+  const send = async (userId, body) => {
+    const res = await fetch('/api/admin', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(Object.assign({ userId }, body)) });
+    const k = await res.json().catch(() => ({})); if (!res.ok) throw new Error(k.error || 'No se pudo guardar.');
+    const i = j.cuentas.findIndex(c => c.userId === userId); j.cuentas[i] = Object.assign(j.cuentas[i], k.cuenta);
+    j.pagos = j.cuentas.filter(c => c.plan === 'pago').length; j.prueba = j.cuentas.filter(c => c.plan === 'prueba').length; return j.cuentas[i];
+  };
+  openDialog(`${head('Administración')}
+    <div class="feat" id="ad-stats" style="grid-template-columns:repeat(3,minmax(0,1fr))">${stats()}</div>
+    <p class="small muted" style="margin:0">Activa el plan solo cuando veas el pago en tu cuenta de Mercado Pago o Nequi. Cada cambio se guarda al instante y el cliente lo ve al volver a abrir la app.</p>
+    <label class="f">Buscar por correo<input id="ad-q" inputmode="email" autocomplete="off"></label>
+    <div style="display:grid;gap:8px" id="ad-list">${list()}</div>`, r => {
+    const box = r.querySelector('#ad-list');
+    const redraw = () => { box.innerHTML = list(); r.querySelector('#ad-stats').innerHTML = stats(); };
+    r.querySelector('#ad-q').oninput = e => { filt = e.target.value.trim(); redraw(); };
+    box.addEventListener('click', async e => {
+      const b = e.target.closest('[data-ad],[data-undo]'); if (!b) return;
+      const u = b.dataset.u || b.dataset.undo; const c = j.cuentas.find(x => x.userId === u);
+      box.querySelectorAll('button').forEach(x => x.disabled = true); const old = b.textContent; b.textContent = 'Guardando…';
+      try {
+        if (b.dataset.undo) { await send(u, { accion: 'restaurar', pagoHasta: last[u].prev.pagoHasta ?? null, trialHasta: last[u].prev.trialHasta }); delete last[u]; toast('Cambio deshecho'); }
+        else { const prev = { pagoHasta: c.pagoHasta ?? null, trialHasta: c.trialHasta }; const nc = await send(u, { accion: b.dataset.ad }); last[u] = { prev, msg: `${ACC[b.dataset.ad]}. Ahora: ${estado(nc)}.` }; toast('Guardado'); }
+      } catch (err) { toast(err.message || 'No se pudo guardar.'); b.textContent = old; }
+      redraw(); const el = document.getElementById('adc-' + u); if (el) el.scrollIntoView({ block: 'nearest' });
     });
   });
-  draw();
+  dlg.addEventListener('close', () => refreshCloud(true), { once: true });
 }
 
 // ---------- acceso familiar ----------
