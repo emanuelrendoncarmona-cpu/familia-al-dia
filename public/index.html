@@ -304,6 +304,7 @@ const TIPOS = {
   vacuna: { label: 'Vacunación', req: ['Carné de vacunas', 'Documento de identidad'] },
   colegio: { label: 'Colegio', req: ['Boletín o citación', 'Preguntas para el docente'] },
   tramite: { label: 'Trámite', req: ['Documento de identidad', 'Formularios', 'Comprobantes'] },
+  particular: { label: 'Cita particular', req: ['Documento de identidad', 'Exámenes y fórmulas recientes', 'Lista de medicamentos actuales', 'Forma de pago (pregunta si reciben tarjeta o transferencia)'] },
   otra: { label: 'Otra', req: ['Documento de identidad'] },
 };
 // Canales oficiales verificados en el sitio de cada EPS el 20 de octubre de 2026. Cambian seguido: revisar cada mes.
@@ -338,6 +339,7 @@ const RESPONSABLE = { nombre: 'Emnova', correo: 'emanuelrendoncarmona@gmail.com'
 let view = 'inicio', filter = 'todos', dayFilter = null, salud = 'ordenes', answer = null;
 const LS_KEY = 'familia-al-dia:v1', LS_SIZE = 'familia-al-dia:size';
 // Cuentas (versión publicada en Netlify)
+let famInfo = null, rol = 'admin', baseSnap = null, invitacion = null;
 let netlifyId = null, idSettings = null, authUser = null, acct = null, isAdminUser = false, pendingSync = false, recoveryPending = false, authNotice = '', lastFetch = 0;
 const IDENTITY_URL = 'https://cdn.jsdelivr.net/npm/@netlify/identity@2.0.0/+esm';
 // Planes y forma de pago. Pega aquí tus links de Wompi o Mercado Pago y tu WhatsApp de ventas (solo números, con 57).
@@ -345,7 +347,24 @@ const PAGO = { mensual: '$9.900 COP al mes', anual: '$99.000 COP al año', linkM
 const aiOn = () => !!sampleApi || mode === 'netlify';
 const photoOn = () => sampleImages || mode === 'netlify';
 const lsKey = () => authUser ? LS_KEY + ':' + authUser.id : LS_KEY;
-const emptyState = () => ({ v: 1, consent: null, familia: { nombre: '' }, miembros: [], citas: [], auts: [], controles: [], meds: [], sols: [], ejemplo: false });
+const emptyState = () => ({ v: 1, consent: null, familia: { nombre: '' }, miembros: [], citas: [], auts: [], controles: [], meds: [], sols: [], opciones: [], ejemplo: false });
+const clone = o => JSON.parse(JSON.stringify(o));
+const COLLS = ['miembros', 'citas', 'auts', 'controles', 'meds', 'sols', 'opciones'];
+// Une los cambios locales con los de otro integrante (lo que cambiaste tú gana; lo que otro agregó se conserva).
+function merge3(base, local, remote) {
+  base = base || {}; const out = clone(remote);
+  for (const k of COLLS) {
+    const B = new Map((base[k] || []).map(x => [x.id, x])), L = new Map((local[k] || []).map(x => [x.id, x]));
+    let R = (out[k] || []).slice();
+    for (const [id, item] of L) { const b = B.get(id); if (!b || JSON.stringify(b) !== JSON.stringify(item)) { const i = R.findIndex(x => x.id === id); if (i >= 0) R[i] = item; else R.push(item); } }
+    for (const id of B.keys()) if (!L.has(id)) R = R.filter(x => x.id !== id);
+    out[k] = R;
+  }
+  for (const k of ['familia', 'consent', 'ejemplo']) if (JSON.stringify(base[k]) !== JSON.stringify(local[k])) out[k] = local[k];
+  return out;
+}
+const isDirty = () => baseSnap && JSON.stringify(stripMeta(S)) !== JSON.stringify(stripMeta(baseSnap));
+const stripMeta = o => { const c = Object.assign({}, o); delete c.version; delete c.guardado; delete c.guardadoPor; return c; };
 
 // ---------- text size (per viewer convenience) ----------
 let big = false; try { big = localStorage.getItem(LS_SIZE) === '1'; } catch (_) {}
@@ -371,12 +390,22 @@ function persist() {
       } else if (mode === 'netlify') {
         writeLocal(snap);
         if (acct && !acct.activo) { pendingSync = false; setStatus(); return; }
+        if (rol === 'lector') { toast('Tienes acceso solo para ver: tus cambios no se guardan.'); return; }
         try {
-          const r = await fetch('/api/data', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(snap), credentials: 'same-origin' });
-          if (r.status === 402) { if (acct) acct.activo = false; render(); openPlan(); return; }
-          if (r.status === 401) { toast('Tu sesión se cerró. Entra de nuevo para guardar.'); pendingSync = true; setStatus(); return; }
-          if (!r.ok) throw new Error(String(r.status));
-          const j = await r.json(); S.guardado = j.guardado; pendingSync = false; lastFetch = Date.now();
+          let body = snap;
+          for (let intento = 0; intento < 3; intento++) {
+            const r = await fetch('/api/data', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' });
+            if (r.status === 402) { if (acct) acct.activo = false; render(); openPlan(); return; }
+            if (r.status === 401) { toast('Tu sesión se cerró. Entra de nuevo para guardar.'); pendingSync = true; setStatus(); return; }
+            if (r.status === 403) { rol = 'lector'; toast('Tienes acceso solo para ver.'); render(); return; }
+            if (r.status === 409) {
+              const j = await r.json(); const merged = merge3(baseSnap, body, j.agenda); merged.version = j.agenda.version;
+              baseSnap = clone(j.agenda); body = merged; S = Object.assign(emptyState(), clone(merged)); render(); continue;
+            }
+            if (!r.ok) throw new Error(String(r.status));
+            const j = await r.json(); body.version = j.version; body.guardado = j.guardado; S.version = j.version; S.guardado = j.guardado;
+            baseSnap = clone(body); pendingSync = false; lastFetch = Date.now(); break;
+          }
         } catch (_) { pendingSync = true; }
         setStatus();
       } else if (mode === 'local') writeLocal(snap);
@@ -384,10 +413,21 @@ function persist() {
   }, 350);
 }
 window.addEventListener('online', () => { if (mode === 'netlify' && pendingSync) persist(); });
-document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState !== 'visible' || mode !== 'netlify' || pendingSync || Date.now() - lastFetch < 60000 || dlg.open) return;
-  try { const r = await fetch('/api/data', { credentials: 'same-origin' }); if (!r.ok) return; const j = await r.json(); lastFetch = Date.now(); acct = j.cuenta; if (j.agenda && j.agenda.guardado && j.agenda.guardado !== S.guardado) { S = Object.assign(emptyState(), j.agenda); render(); } } catch (_) {}
-});
+async function refreshCloud(force) {
+  if (mode !== 'netlify' || pendingSync || dlg.open || (!force && Date.now() - lastFetch < 40000)) return;
+  try {
+    const r = await fetch('/api/data', { credentials: 'same-origin' }); if (!r.ok) return; const j = await r.json(); lastFetch = Date.now();
+    if (j.pendingInvite) return;
+    acct = j.cuenta; famInfo = j.familia; rol = j.rol || rol; invitacion = j.invitacion;
+    if (j.agenda && Number(j.agenda.version || 0) !== Number(S.version || 0)) {
+      const next = isDirty() ? merge3(baseSnap, S, j.agenda) : clone(j.agenda);
+      next.version = j.agenda.version; baseSnap = clone(j.agenda); S = Object.assign(emptyState(), next); render();
+      if (isDirty()) persist();
+    }
+  } catch (_) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshCloud(); });
+setInterval(() => { if (document.visibilityState === 'visible') refreshCloud(); }, 45000);
 function writeLocal(snap) { try { localStorage.setItem(lsKey(), JSON.stringify(snap)); } catch (_) { if (mode === 'local') { mode = 'memory'; setStatus(); } } }
 function readLocal(key) { try { const r = localStorage.getItem(key || lsKey()); return r ? JSON.parse(r) : null; } catch (_) { return undefined; } }
 function setStatus() {
@@ -443,13 +483,17 @@ async function loadCloud() {
     S = Object.assign(emptyState(), cached || {}); pendingSync = !!cached; setStatus(); render();
     toast('Sin conexión. Mostrando lo último guardado en este celular.'); return;
   }
-  acct = j.cuenta; isAdminUser = !!j.admin;
+  if (j.pendingInvite) { renderInvite(j.pendingInvite); return; }
+  acct = j.cuenta; isAdminUser = !!j.admin; famInfo = j.familia; rol = j.rol || 'admin'; invitacion = j.invitacion;
+  baseSnap = j.agenda ? clone(j.agenda) : null;
   const cached = readLocal();
   const base = j.agenda || (cached && cached.guardado && !j.agenda ? cached : null);
   S = Object.assign(emptyState(), base || {});
   if (!Array.isArray(S.sols)) S.sols = [];
+  if (!Array.isArray(S.opciones)) S.opciones = [];
+  if (j.agenda) S.version = j.agenda.version || 0;
   setStatus(); render();
-  if (!j.agenda) {
+  if (!j.agenda && rol === 'admin') {
     const legacy = readLocal(LS_KEY);
     if (legacy && Array.isArray(legacy.miembros) && legacy.miembros.length && !legacy.ejemplo) {
       openConfirm('¿Traer los datos de este celular?', `Encontramos ${legacy.miembros.length} personas y ${legacy.citas.length} citas guardadas aquí antes de crear tu cuenta. Puedes pasarlas a tu cuenta para verlas en cualquier dispositivo.`, 'Pasarlos a mi cuenta', () => { S = Object.assign(emptyState(), legacy); persist(); render(); toast('Datos pasados a tu cuenta'); });
@@ -602,11 +646,13 @@ function render() {
   renderDock();
   if (!S.consent) { app.innerHTML = onboardHTML(); bindOnboard(); return; }
   $('#famName').textContent = S.familia.nombre ? 'Familia ' + S.familia.nombre : 'Agenda familiar';
-  const demo = S.ejemplo ? `<div class="notice"><span>Estás viendo una familia de ejemplo.</span><button class="btn sm" data-act="clear-demo">Empezar con la mía</button></div>` : '';
+  const demo = S.ejemplo && rol === 'admin' ? `<div class="notice"><span>Estás viendo una familia de ejemplo.</span><button class="btn sm" data-act="clear-demo">Empezar con la mía</button></div>` : '';
   const pay = mode === 'netlify' && acct && !acct.activo ? `<div class="notice" style="background:var(--crit-soft)"><span><b>Tu prueba gratis terminó.</b> Puedes ver y exportar tus datos, pero los cambios no se guardan hasta activar tu plan.</span><button class="btn sm primary" data-act="plan">Activar plan</button></div>`
     : mode === 'netlify' && acct && acct.plan === 'prueba' && acct.dias <= 3 ? `<div class="notice"><span>Te quedan ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'} de prueba gratis.</span><button class="btn sm" data-act="plan">Ver planes</button></div>` : '';
+  const roBanner = mode === 'netlify' && rol === 'lector' ? `<div class="notice"><span>Tienes acceso <b>solo para ver</b> la agenda de esta familia.</span></div>` : '';
+  const invBanner = mode === 'netlify' && invitacion ? `<div class="notice" style="background:var(--ai-soft)"><span><b>${esc(invitacion.por)}</b> te invitó a la familia ${esc(invitacion.familia || '')}.</span><span class="chips"><button class="btn sm" data-act="inv-no">No, gracias</button><button class="btn sm primary" data-act="inv-si">Unirme</button></span></div>` : '';
   const body = view === 'inicio' ? inicioHTML() : view === 'agenda' ? agendaHTML() : view === 'salud' ? saludHTML() : view === 'ayuda' ? ayudaHTML() : familiaHTML();
-  app.innerHTML = demo + pay + body;
+  app.innerHTML = demo + pay + roBanner + invBanner + body;
   bind(app);
 }
 
@@ -679,9 +725,14 @@ function citaCard(c) {
 
 function saludHTML() {
   const nT = (S.sols || []).filter(x => x.estado === 'esperando').length, nA = S.auts.filter(a => a.estado !== 'usada' && (daysUntil(a.vence) ?? 99) <= 15).length, nC = S.controles.filter(k => k.estado === 'pendiente').length, nM = S.meds.filter(m => (daysUntil(m.proxima) ?? 99) <= 5).length;
-  const seg = `<div class="seg" role="group" aria-label="Sección">${[['tramites', 'Trámites', nT], ['ordenes', 'Órdenes', nA], ['controles', 'Controles', nC], ['meds', 'Medicamentos', nM]].map(([k, l, c]) => `<button aria-pressed="${salud === k}" data-salud="${k}">${l}${c ? `<span class="n">${c}</span>` : ''}</button>`).join('')}</div>`;
+  const seg = `<div class="seg" role="group" aria-label="Sección">${[['tramites', 'Trámites', nT], ['ordenes', 'Órdenes', nA], ['controles', 'Controles', nC], ['meds', 'Medicamentos', nM], ['particular', 'Particulares', 0], ['guias', 'Guías', 0]].map(([k, l, c]) => `<button aria-pressed="${salud === k}" data-salud="${k}">${l}${c ? `<span class="n">${c}</span>` : ''}</button>`).join('')}</div>`;
   let h = `<div class="sec" style="margin-top:8px"><div class="sec-head"><h2>Salud</h2></div>${seg}</div><div class="sec" style="margin-top:14px">`;
-  if (salud === 'tramites') {
+  if (salud === 'guias') {
+    h += `<p class="small muted" style="margin:0">Pasos y derechos para los trámites más difíciles con la EPS. Basados en la norma vigente; no son asesoría legal.</p>` + GUIAS.map(g => `<button class="card" data-guia="${g.id}"><span class="row"><b class="grow">${esc(g.titulo)}</b><span class="badge accent">${g.pasos.length} pasos</span></span><span class="small muted">${esc(g.resumen)}</span></button>`).join('');
+  } else if (salud === 'particular') {
+    const list = S.opciones || [];
+    h += `<div class="row"><span class="small muted grow">Cuando la EPS demora o prefieres pagar: busca opciones, compáralas y verifica al médico antes de ir.</span><button class="btn primary sm" data-act="particular">${ic('spark')} Buscar cita particular</button></div>` + (list.length ? list.map(o => { const m = member(o.miembroId); return `<button class="card" data-opc="${o.id}"><span class="row"><b class="grow">${esc(o.nombre)}</b>${o.precio ? `<span class="badge">${esc(o.precio)}</span>` : ''}</span><span class="small muted">${esc(o.especialidad || '')}${o.ciudad ? ' · ' + esc(o.ciudad) : ''}${m ? ' · para ' + esc(first(m)) : ''}${o.calificacion ? ' · ' + esc(o.calificacion) : ''}</span></button>`; }).join('') : `<div class="empty"><b>Aún no has guardado opciones</b><span class="muted small">Busca una especialidad en tu ciudad y guarda las que te interesen para compararlas.</span></div>`);
+  } else if (salud === 'tramites') {
     const list = [...(S.sols || [])].sort((a, b) => (a.estado !== 'esperando') - (b.estado !== 'esperando') || a.fecha.localeCompare(b.fecha));
     h += `<div class="row"><span class="small muted grow">Citas o autorizaciones que pediste y aún no te dan. Te avisamos si pasan muchos días.</span><button class="btn primary sm" data-act="pedir">${ic('plus')} Pedir cita</button></div>` + (list.length ? list.map(x => { const m = member(x.miembroId); const n = -daysUntil(x.fecha); const cls = x.estado !== 'esperando' ? 'good' : n >= 10 ? 'crit' : n >= 5 ? 'warn' : ''; return `<button class="card" data-sol="${x.id}"><span class="row"><b class="grow">${esc(x.que)}</b><span class="badge ${cls}">${x.estado === 'esperando' ? (n === 0 ? 'Pedida hoy' : `Esperando · ${n} ${n === 1 ? 'día' : 'días'}`) : 'Resuelta'}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')} · pedida por ${esc(x.canal || '—')} el ${fmtDate(x.fecha)}${x.radicado ? ` · radicado <span class="mono">${esc(x.radicado)}</span>` : ''}</span></button>`; }).join('') : `<div class="empty"><b>No tienes trámites pendientes</b><span class="muted small">Cuando pidas una cita y te digan “le devolvemos la llamada”, anótalo aquí.</span></div>`);
   } else if (salud === 'ordenes') {
@@ -707,6 +758,7 @@ function familiaHTML() {
       <dl class="facts"><dt>EPS</dt><dd>${esc(m.eps || '—')}${m.regimen ? ' · ' + esc(m.regimen) : ''}</dd><dt>Documento</dt><dd class="mono">${esc(m.doc || '—')}</dd>${m.alergias ? `<dt>Alergias</dt><dd><span class="badge crit">${esc(m.alergias)}</span></dd>` : ''}<dt>Próxima</dt><dd>${prox ? `${esc(citaTitle(prox))}, ${fmtDate(prox.fecha)}` : 'Sin citas'}</dd><dt>Órdenes</dt><dd>${pend} ${pend === 1 ? 'vigente' : 'vigentes'}</dd></dl>
       <div class="actions"><button class="btn sm primary" data-pedir="${m.id}">${ic('cal')} Pedir cita${e ? ' a ' + esc(e.n) : ''}</button><button class="btn sm" data-member="${m.id}">Editar</button></div></span></div>`;
   }).join('') : `<div class="empty"><b>Aún no hay nadie</b><span class="muted small">Agrega a las personas cuyas citas organizas.</span></div>`}</div>
+  ${mode === 'netlify' && famInfo ? accessHTML() : ''}
   <div class="sec"><div class="sec-head"><h2>Ajustes</h2><button class="btn ghost sm" data-act="help">${ic('spark')} Ayuda y preguntas</button></div>
     ${mode === 'netlify' && acct ? `<div class="card"><div class="row"><span class="grow"><b>Tu cuenta</b><br><span class="small muted">${esc(acct.email || '')}</span><br><span class="badge ${acct.plan === 'pago' ? 'good' : acct.plan === 'prueba' ? 'accent' : 'crit'}">${acct.plan === 'pago' ? 'Plan activo hasta el ' + fmtDate(String(acct.hasta).slice(0, 10)) : acct.plan === 'prueba' ? `Prueba gratis · ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}` : 'Plan vencido'}</span></span><span class="chips"><button class="btn sm ${acct.plan === 'pago' ? '' : 'primary'}" data-act="plan">${acct.plan === 'pago' ? 'Mi plan' : 'Activar plan'}</button><button class="btn sm" data-act="logout">Cerrar sesión</button></span></div></div>
     <div class="card"><div class="row"><span class="grow"><b>Conectar mi calendario</b><br><span class="small muted">Tus citas aparecen solas en Google Calendar o en el iPhone.</span></span><button class="btn sm" data-act="calendar">Conectar</button></div></div>` : ''}
@@ -732,6 +784,11 @@ function bind(app) {
   app.querySelectorAll('[data-med]').forEach(b => b.onclick = () => openMed(b.dataset.med));
   app.querySelectorAll('[data-agendar-ctl]').forEach(b => b.onclick = () => { const k = S.controles.find(x => x.id === b.dataset.agendarCtl); openPedir({ miembroId: k.miembroId, que: 'Control de ' + k.especialidad, especialidad: k.especialidad, controlId: k.id }); });
   app.querySelectorAll('[data-pedir]').forEach(b => b.onclick = () => openPedir({ miembroId: b.dataset.pedir }));
+  app.querySelectorAll('[data-acc]').forEach(b => b.onclick = () => openAccess(b.dataset.acc));
+  app.querySelectorAll('[data-inv-cancel]').forEach(b => b.onclick = () => famAction({ accion: 'cancelar', email: b.dataset.invCancel }, 'Invitación cancelada'));
+  app.querySelectorAll('[data-inv-share]').forEach(b => b.onclick = () => shareInvite(b.dataset.invShare));
+  app.querySelectorAll('[data-guia]').forEach(b => b.onclick = () => openGuia(b.dataset.guia));
+  app.querySelectorAll('[data-opc]').forEach(b => b.onclick = () => openOpcion(b.dataset.opc));
   app.querySelectorAll('[data-sol]').forEach(b => b.onclick = () => openSol(b.dataset.sol));
   $('#restoreIn')?.addEventListener('change', e => importData(e.target.files[0]));
   app.querySelectorAll('[data-del-ctl]').forEach(b => b.onclick = () => removeWithUndo('controles', b.dataset.delCtl, 'Control quitado'));
@@ -740,7 +797,7 @@ function bind(app) {
   $('#helpForm')?.addEventListener('submit', e => { e.preventDefault(); askHelp($('#helpIn').value.trim()); });
   app.querySelectorAll('[data-faq-go]').forEach(b => b.onclick = () => ({ familia: () => go('familia'), plus: () => openPlus(), calendar: () => (mode === 'netlify' ? openCalendar() : go('familia')), install: () => openInstall(), plan: () => openPlan() })[b.dataset.faqGo]?.());
   app.querySelectorAll('[data-act]').forEach(b => b.onclick = () => ({
-    'add-member': () => openMember(), 'new-cita': () => openCitaForm(), 'plus': () => openPlus(), 'week': () => shareWeek(), 'help': () => go('ayuda'), 'plan': () => openPlan(), 'calendar': () => openCalendar(), 'csv': () => exportCSV(), 'admin': () => openAdmin(), 'logout': () => doLogout(), 'install': () => openInstall(), 'backup': () => exportData(), 'restore': () => $('#restoreIn').click(), 'privacy': () => openPrivacy(), 'wipe': () => openConfirm('¿Borrar todos tus datos?', 'Se eliminan todas las personas, citas, órdenes, controles, medicamentos y trámites. No se puede deshacer.', 'Borrar todo', async () => { if (mode === 'netlify') { try { await fetch('/api/data', { method: 'DELETE', credentials: 'same-origin' }); } catch (_) {} try { localStorage.removeItem(lsKey()); } catch (_) {} S = emptyState(); view = 'inicio'; render(); toast('Datos borrados de tu cuenta'); return; } S = emptyState(); persist(); view = 'inicio'; render(); toast('Datos borrados'); }), 'add-aut': () => openAut(), 'add-ctl': () => openCtl(), 'add-med': () => openMed(),
+    'add-member': () => openMember(), 'new-cita': () => openCitaForm(), 'plus': () => openPlus(), 'week': () => shareWeek(), 'invite': () => openInvite(), 'inv-si': () => famAction({ accion: 'aceptar' }, 'Te uniste a la familia'), 'inv-no': () => famAction({ accion: 'rechazar' }, 'Invitación rechazada'), 'leave': () => openConfirm('¿Salir de esta familia?', 'Dejarás de ver su agenda. Podrás volver si te invitan de nuevo.', 'Salir', () => famAction({ accion: 'salir' }, 'Saliste de la familia')), 'particular': () => openParticular(), 'guias': () => go('salud', 'guias'), 'help': () => go('ayuda'), 'plan': () => openPlan(), 'calendar': () => openCalendar(), 'csv': () => exportCSV(), 'admin': () => openAdmin(), 'logout': () => doLogout(), 'install': () => openInstall(), 'backup': () => exportData(), 'restore': () => $('#restoreIn').click(), 'privacy': () => openPrivacy(), 'wipe': () => openConfirm('¿Borrar todos tus datos?', 'Se eliminan todas las personas, citas, órdenes, controles, medicamentos y trámites. No se puede deshacer.', 'Borrar todo', async () => { if (mode === 'netlify') { try { await fetch('/api/data', { method: 'DELETE', credentials: 'same-origin' }); } catch (_) {} try { localStorage.removeItem(lsKey()); } catch (_) {} S = emptyState(); view = 'inicio'; render(); toast('Datos borrados de tu cuenta'); return; } S = emptyState(); persist(); view = 'inicio'; render(); toast('Datos borrados'); }), 'add-aut': () => openAut(), 'add-ctl': () => openCtl(), 'add-med': () => openMed(),
     'clear-day': () => { dayFilter = null; render(); }, 'pedir': () => openPedir({}), 'close-answer': () => { answer = null; render(); },
     'clear-demo': () => openConfirm('¿Borrar la familia de ejemplo?', 'Se eliminan los datos de ejemplo para que empieces con los tuyos.', 'Borrar ejemplo', () => { const c = S.consent; S = emptyState(); S.consent = c; persist(); view = 'familia'; render(); openMember(); }),
   })[b.dataset.act]?.());
@@ -886,7 +943,7 @@ function openCita(id) {
   const c = S.citas.find(x => x.id === id); if (!c) return; const m = member(c.miembroId);
   const draw = () => openDialog(`${head(citaTitle(c))}
     <div class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')} · ${esc(TIPOS[c.tipo]?.label || '')}</div>
-    <dl class="facts"><dt>Cuándo</dt><dd>${esc(fmtLong(c.fecha))}, ${esc(fmtHora(c.hora))} (${relDays(daysUntil(c.fecha))})</dd><dt>Dónde</dt><dd>${esc(c.lugar || 'Por confirmar')}</dd>${c.profesional ? `<dt>Profesional</dt><dd>${esc(c.profesional)}</dd>` : ''}<dt>Acompaña</dt><dd>${esc(c.acompana || 'Nadie asignado')}</dd>${c.notas ? `<dt>Notas</dt><dd>${esc(c.notas)}</dd>` : ''}${m?.alergias ? `<dt>Alergias</dt><dd><span class="badge crit">${esc(m.alergias)}</span></dd>` : ''}</dl>
+    <dl class="facts"><dt>Cuándo</dt><dd>${esc(fmtLong(c.fecha))}, ${esc(fmtHora(c.hora))} (${relDays(daysUntil(c.fecha))})</dd><dt>Dónde</dt><dd>${esc(c.lugar || 'Por confirmar')}</dd>${c.profesional ? `<dt>Profesional</dt><dd>${esc(c.profesional)}</dd>` : ''}${c.costo ? `<dt>Costo</dt><dd>${esc(c.costo)}</dd>` : ''}${c.telefono ? `<dt>Teléfono</dt><dd><span class="mono">${esc(c.telefono)}</span> <a href="tel:${encodeURIComponent(c.telefono)}">Llamar</a></dd>` : ''}<dt>Acompaña</dt><dd>${esc(c.acompana || 'Nadie asignado')}</dd>${c.notas ? `<dt>Notas</dt><dd>${esc(c.notas)}</dd>` : ''}${m?.alergias ? `<dt>Alergias</dt><dd><span class="badge crit">${esc(m.alergias)}</span></dd>` : ''}</dl>
     <div class="actions"><a class="btn sm" href="${esc(gcalUrl(c))}" target="_blank" rel="noopener">${ic('google')} A mi calendario</a><a class="btn sm" href="${esc(waUrl(c))}" target="_blank" rel="noopener">${ic('share')} Enviar por WhatsApp</a><button class="btn sm" id="cd-copy">${ic('copy')} Copiar</button></div>
     <div><b>Qué llevar</b><div class="checklist" style="margin-top:6px">${(c.req || []).map((r, i) => `<label class="${r.ok ? 'ok' : ''}"><input type="checkbox" data-req="${i}" ${r.ok ? 'checked' : ''}><span>${esc(r.t)}</span></label>`).join('') || '<span class="muted small">Sin requisitos.</span>'}</div>
     <form class="addreq" id="addreqF" style="margin-top:8px"><input id="newreq" placeholder="Agregar algo para llevar" aria-label="Agregar requisito"><button class="btn sm" type="submit">Agregar</button></form></div>
@@ -943,6 +1000,8 @@ function openCitaForm(pre = {}) {
       <label class="f full">Lugar<input id="cf-lugar" value="${esc(c.lugar || '')}" placeholder="Clínica, sede y consultorio"></label>
       <label class="f">Profesional<input id="cf-prof" value="${esc(c.profesional || '')}" placeholder="Opcional"></label>
       <label class="f">Quién acompaña<input id="cf-acomp" value="${esc(c.acompana || '')}" placeholder="Opcional"></label>
+      <label class="f">Costo (si pagas)<input id="cf-costo" value="${esc(c.costo || '')}" placeholder="Ej.: $120.000" inputmode="numeric"></label>
+      <label class="f">Teléfono del lugar<input id="cf-tel" value="${esc(c.telefono || '')}" placeholder="Opcional" inputmode="tel"></label>
       ${!editing ? `<label class="f">Se repite<select id="cf-rep"><option value="0">No se repite</option><option value="7">Cada semana</option><option value="14">Cada 2 semanas</option><option value="m">Cada mes</option></select></label>
       <label class="f" id="cf-veces-w" hidden>¿Cuántas citas en total?<input type="number" id="cf-veces" min="2" max="30" value="4" inputmode="numeric"></label>` : ''}
       <label class="f full">Notas<textarea id="cf-notas">${esc(c.notas || '')}</textarea></label>
@@ -977,7 +1036,7 @@ ${text ? 'Mensaje:\n' + text : 'Lee la imagen adjunta.'}`;
     r.querySelector('#cf-save').onclick = () => {
       const fecha = val(r, 'cf-fecha'); if (!fecha) { r.querySelector('#cf-fecha').focus(); toast('Falta la fecha'); return; }
       const tipo = val(r, 'cf-tipo');
-      const data = { miembroId: val(r, 'cf-m'), tipo, especialidad: val(r, 'cf-esp'), fecha, hora: val(r, 'cf-hora'), lugar: val(r, 'cf-lugar'), profesional: val(r, 'cf-prof'), acompana: val(r, 'cf-acomp'), notas: val(r, 'cf-notas') };
+      const data = { miembroId: val(r, 'cf-m'), tipo, especialidad: val(r, 'cf-esp'), fecha, hora: val(r, 'cf-hora'), lugar: val(r, 'cf-lugar'), profesional: val(r, 'cf-prof'), acompana: val(r, 'cf-acomp'), costo: val(r, 'cf-costo'), telefono: val(r, 'cf-tel'), notas: val(r, 'cf-notas') };
       if (!warned) {
         const clash = findClash(data, editing ? c.id : null);
         if (clash) { warned = true; const w = r.querySelector('#cf-warn'); w.hidden = false; w.textContent = clash; r.querySelector('#cf-save').textContent = 'Guardar de todas formas'; return; }
@@ -1202,6 +1261,185 @@ async function openAdmin() {
   draw();
 }
 
+// ---------- acceso familiar ----------
+const ROL_TXT = { admin: 'Administra', editor: 'Puede editar', lector: 'Solo ver' };
+function accessHTML() {
+  const f = famInfo, admin = rol === 'admin';
+  return `<div class="sec"><div class="sec-head"><h2>Quién tiene acceso</h2>${admin ? `<button class="btn primary sm" data-act="invite">${ic('plus')} Invitar</button>` : ''}</div>
+    <p class="small muted" style="margin:0">Cada integrante entra con su propio correo y ve la misma agenda. ${admin ? 'Tú decides quién puede editar y quién solo puede ver.' : ''}</p>
+    ${f.miembros.map(m => `<${admin && !m.dueno && !m.yo ? `button class="card" data-acc="${esc(m.userId)}"` : 'div class="card"'}><span class="row"><b class="grow" style="overflow-wrap:anywhere">${esc(m.email)}${m.yo ? ' (tú)' : ''}</b><span class="badge ${m.rol === 'admin' ? 'accent' : m.rol === 'lector' ? '' : 'good'}">${m.dueno ? 'Creó la familia' : ROL_TXT[m.rol]}</span></span></${admin && !m.dueno && !m.yo ? 'button' : 'div'}>`).join('')}
+    ${f.invitaciones.length ? `<div class="label">Invitaciones pendientes</div>` + f.invitaciones.map(i => `<div class="card"><span class="row"><b class="grow" style="overflow-wrap:anywhere">${esc(i.email)}</b><span class="badge warn">${ROL_TXT[i.rol]} · pendiente</span></span>${admin ? `<span class="chips"><button class="btn sm" data-inv-share="${esc(i.email)}">${ic('share')} Enviar aviso</button><button class="btn sm danger" data-inv-cancel="${esc(i.email)}">Cancelar</button></span>` : ''}</div>`).join('') : ''}
+    ${!f.esDueno ? '<button class="btn ghost sm danger" data-act="leave" style="width:fit-content">Salir de esta familia</button>' : ''}
+  </div>`;
+}
+async function famAction(body, okMsg) {
+  try {
+    const r = await fetch('/api/family', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'No se pudo completar.');
+    if (dlg.open) dlg.close();
+    if (['aceptar', 'rechazar', 'salir'].includes(body.accion)) { toast(okMsg); invitacion = null; await loadCloud(); return j; }
+    if (j.familia) famInfo = j.familia; render(); toast(okMsg); return j;
+  } catch (e) { toast(e.message || 'No se pudo completar.'); return null; }
+}
+function openInvite() {
+  openDialog(`${head('Invitar a un integrante')}
+    <p class="muted" style="margin:0">Escribe el correo con el que esa persona va a entrar (o su cuenta de Google). Le llegará la invitación al iniciar sesión.</p>
+    <form id="iv-f" style="display:grid;gap:12px">
+      <label class="f">Correo<input id="iv-email" type="email" inputmode="email" autocomplete="off" required></label>
+      <label class="f">Qué puede hacer<select id="iv-rol"><option value="editor">Ver y editar la agenda</option><option value="lector">Solo ver</option><option value="admin">Administrar (invitar y quitar personas)</option></select></label>
+      <div class="dlg-foot"><button class="btn" type="button" id="iv-no">Cancelar</button><button class="btn primary" type="submit">Invitar</button></div>
+    </form>`, r => {
+    r.querySelector('#iv-no').onclick = () => dlg.close();
+    r.querySelector('#iv-f').onsubmit = async e => { e.preventDefault(); const email = val(r, 'iv-email').toLowerCase(); const ok = await famAction({ accion: 'invitar', email, rol: val(r, 'iv-rol') }, 'Invitación creada'); if (ok) shareInvite(email); };
+  });
+}
+function shareInvite(email) {
+  const txt = `Hola, te invité a la agenda de nuestra familia en Familia al Día. Entra a ${location.origin}, crea tu cuenta con este correo (${email}) y acepta la invitación. Ahí vemos todas las citas, órdenes y medicamentos de la familia.`;
+  openDialog(`${head('Avísale a la persona')}<div class="answer" style="margin:0"><p>${esc(txt)}</p></div>
+    <div class="dlg-foot"><button class="btn" id="si-copy">${ic('copy')} Copiar</button><a class="btn primary" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">${ic('share')} Enviar por WhatsApp</a></div>`, r => { r.querySelector('#si-copy').onclick = () => copyText(txt); });
+}
+function openAccess(userId) {
+  const m = famInfo.miembros.find(x => x.userId === userId); if (!m) return;
+  openDialog(`${head(m.email)}
+    <label class="f">Qué puede hacer<select id="ac-rol">${Object.entries(ROL_TXT).map(([k, t]) => `<option value="${k}" ${k === m.rol ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+    <div class="dlg-foot"><button class="btn ghost danger" id="ac-del">Quitar acceso</button><button class="btn primary" id="ac-save">Guardar</button></div>`, r => {
+    r.querySelector('#ac-save').onclick = () => famAction({ accion: 'rol', userId, rol: val(r, 'ac-rol') }, 'Permisos actualizados');
+    r.querySelector('#ac-del').onclick = () => openConfirm('¿Quitarle el acceso?', `${m.email} dejará de ver la agenda de la familia.`, 'Quitar acceso', () => famAction({ accion: 'quitar', userId }, 'Acceso quitado'));
+  });
+}
+function renderInvite(pi) {
+  mode = 'netlify'; setStatus(); $('#dock').hidden = true;
+  $('#app').innerHTML = `<div class="onboard" style="max-width:520px;margin-inline:auto">
+    <span class="kicker">Invitación</span>
+    <h2>${esc(pi.por || 'Alguien')} te invitó a su familia${pi.familia ? ' ' + esc(pi.familia) : ''}</h2>
+    <p class="muted" style="margin:0">Si aceptas, verás la misma agenda: citas, órdenes, controles y medicamentos. Permiso: <b>${ROL_TXT[pi.rol] || 'Puede editar'}</b>.</p>
+    <div class="row"><button class="btn" id="pi-no">No, crear mi propia agenda</button><button class="btn primary" id="pi-si">Unirme a la familia</button></div>
+    <button class="btn ghost sm" id="pi-out" style="width:fit-content">Cerrar sesión</button>
+  </div>`;
+  $('#pi-si').onclick = () => famAction({ accion: 'aceptar' }, 'Te uniste a la familia');
+  $('#pi-no').onclick = () => famAction({ accion: 'rechazar' }, 'Listo, creamos tu propia agenda');
+  $('#pi-out').onclick = () => doLogout();
+}
+
+// ---------- citas particulares ----------
+const ESPECIALIDADES = ['Medicina general', 'Pediatría', 'Ginecología', 'Medicina interna', 'Cardiología', 'Dermatología', 'Ortopedia', 'Oftalmología', 'Otorrinolaringología', 'Neurología', 'Psiquiatría', 'Psicología', 'Endocrinología', 'Gastroenterología', 'Urología', 'Nutrición', 'Fisioterapia', 'Odontología', 'Laboratorio clínico', 'Ecografía'];
+const DOCTORALIA_SLUG = { 'cardiología': 'cardiologo', 'psicología': 'psicologo', 'ginecología': 'ginecologo' };
+const RETHUS_URL = 'https://www.sispro.gov.co/central-prestadores-de-servicios/Pages/ReTHUS-Registro-de-Talento-Humano-en-Salud.aspx';
+const REPS_URL = 'https://prestadores.minsalud.gov.co/habilitacion/';
+const plain = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+function searchLinks(esp, ciudad) {
+  const q = `${esp} particular ${ciudad}`.trim(); const slug = DOCTORALIA_SLUG[String(esp).toLowerCase()];
+  return [['Google Maps', 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q)],
+    ['Doctoralia', slug && ciudad ? `https://www.doctoralia.co/${slug}/${plain(ciudad).replace(/\s+/g, '-')}` : 'https://www.google.com/search?q=' + encodeURIComponent(`doctoralia ${esp} ${ciudad}`)],
+    ['Google', 'https://www.google.com/search?q=' + encodeURIComponent(`${esp} consulta particular precio ${ciudad}`)]];
+}
+function openParticular(pre = {}) {
+  if (!S.miembros.length) { openMember(); return; }
+  const ciudad0 = pre.ciudad || (S.familia && S.familia.ciudad) || '';
+  openDialog(`${head('Buscar cita particular')}
+    <p class="muted small" style="margin:0">Para cuando la EPS demora o prefieres pagar la consulta. Buscamos opciones reales con precio y calificaciones cuando están publicados.</p>
+    <form id="pt-f" class="fields">
+      <label class="f">¿Para quién?<select id="pt-m">${memberOptions(pre.miembroId)}</select></label>
+      <label class="f">Especialidad o examen<input id="pt-esp" list="esp-list" value="${esc(pre.especialidad || '')}" required placeholder="Ej.: Cardiología"><datalist id="esp-list">${ESPECIALIDADES.map(e => `<option>${e}</option>`).join('')}</datalist></label>
+      <label class="f">Ciudad<input id="pt-city" value="${esc(ciudad0)}" required placeholder="Ej.: Medellín"></label>
+      <label class="f">Modalidad<select id="pt-mod"><option value="cualquiera">Presencial o virtual</option><option value="presencial">Presencial</option><option value="telemedicina">Telemedicina</option></select></label>
+      <label class="f full">Presupuesto aproximado (opcional)<input id="pt-pres" placeholder="Ej.: hasta $150.000"></label>
+      <div class="full row"><span class="small muted grow">Busca en internet en tiempo real. Toma unos segundos.</span><button class="btn primary" type="submit" id="pt-go" ${mode === 'netlify' ? '' : 'disabled'}>${ic('spark')} Buscar opciones</button></div>
+    </form>
+    <div id="pt-out" style="display:grid;gap:10px"></div>
+    <div class="card"><b>Busca también aquí</b><div class="chips" id="pt-links"></div></div>
+    <div class="card" style="border-color:var(--accent)"><b>Antes de pagar, verifica</b><span class="small">Que el profesional esté autorizado para ejercer (ReTHUS) y que el consultorio o clínica esté habilitado (REPS). Pide siempre factura.</span><span class="chips"><a class="btn sm" href="${RETHUS_URL}" target="_blank" rel="noopener">Verificar médico (ReTHUS)</a><a class="btn sm" href="${REPS_URL}" target="_blank" rel="noopener">Verificar clínica (REPS)</a></span></div>`, r => {
+    const drawLinks = () => { r.querySelector('#pt-links').innerHTML = searchLinks(val(r, 'pt-esp') || 'médico', val(r, 'pt-city')).map(([l, u]) => `<a class="btn sm" href="${esc(u)}" target="_blank" rel="noopener">${l}</a>`).join(''); };
+    drawLinks(); r.querySelector('#pt-esp').addEventListener('input', drawLinks); r.querySelector('#pt-city').addEventListener('input', drawLinks);
+    r.querySelector('#pt-f').onsubmit = async e => {
+      e.preventDefault(); const out = r.querySelector('#pt-out'), go = r.querySelector('#pt-go');
+      const q = { mode: 'particular', especialidad: val(r, 'pt-esp'), ciudad: val(r, 'pt-city'), modalidad: val(r, 'pt-mod'), presupuesto: val(r, 'pt-pres') };
+      if (S.familia && S.familia.ciudad !== q.ciudad) { S.familia.ciudad = q.ciudad; persist(); }
+      go.disabled = true; out.innerHTML = `<div class="answer" style="margin:0"><b style="color:var(--ai)">${ic('spark')} Buscando opciones en ${esc(q.ciudad)}…</b><span class="small">Revisamos clínicas, consultorios y directorios. Puede tardar hasta 30 segundos.</span></div>`;
+      try {
+        const res = await aiCall(q); const ops = res.opciones || [];
+        const mid = val(r, 'pt-m');
+        out.innerHTML = (ops.length ? ops.map((o, i) => `<div class="card" style="gap:6px"><div class="row"><b class="grow">${i + 1}. ${esc(o.nombre)}</b><span class="badge ${o.tipo === 'telemedicina' ? 'accent' : ''}">${esc(o.tipo === 'medico' ? 'Médico' : o.tipo === 'telemedicina' ? 'Telemedicina' : 'Clínica / IPS')}</span></div>
+          <span class="small">${esc(o.especialidad || '')}${o.direccion ? ' · ' + esc(o.direccion) : ''}</span>
+          ${o.precio ? `<span class="small"><b>Precio publicado:</b> ${esc(o.precio)}</span>` : '<span class="small muted">Precio no publicado: pregúntalo al agendar.</span>'}
+          ${o.calificacion ? `<span class="small"><b>Calificación:</b> ${esc(o.calificacion)}</span>` : ''}
+          ${o.como_agendar ? `<span class="small"><b>Cómo agendar:</b> ${esc(o.como_agendar)}</span>` : ''}
+          <span class="small muted">Fuente: ${esc(o.fuente || o.url)}</span>
+          <span class="chips"><a class="btn sm" href="${esc(o.url)}" target="_blank" rel="noopener">Ver</a>${o.telefono ? `<a class="btn sm" href="tel:${encodeURIComponent(o.telefono)}">Llamar ${esc(o.telefono)}</a>` : ''}<button class="btn sm" data-save="${i}">Guardar</button><button class="btn sm primary" data-book="${i}">Ya agendé</button></span></div>`).join('') : '<div class="card"><b>No encontramos opciones con datos verificables.</b><span class="small">Usa los enlaces de búsqueda de abajo.</span></div>')
+          + ((res.consejos || []).length ? `<div class="answer" style="margin:0"><b style="color:var(--ai)">Consejos</b>${res.consejos.map(c => `<span class="small">• ${esc(c)}</span>`).join('')}</div>` : '')
+          + '<p class="small muted" style="margin:0">Resultados tomados de internet: confirma precio, horario y que acepte particulares antes de ir.</p>';
+        const toOpt = o => ({ id: uid(), miembroId: mid, nombre: o.nombre, tipo: o.tipo, especialidad: o.especialidad || q.especialidad, ciudad: o.ciudad || q.ciudad, direccion: o.direccion || '', telefono: o.telefono || '', precio: o.precio || '', calificacion: o.calificacion || '', url: o.url, fuente: o.fuente || '', guardado: todayISO() });
+        out.querySelectorAll('[data-save]').forEach(b => b.onclick = () => { S.opciones = S.opciones || []; S.opciones.push(toOpt(ops[+b.dataset.save])); persist(); b.disabled = true; b.textContent = 'Guardada'; toast('Guardada en Salud > Particulares'); });
+        out.querySelectorAll('[data-book]').forEach(b => b.onclick = () => { const o = ops[+b.dataset.book]; openCitaForm({ miembroId: mid, tipo: 'particular', especialidad: o.especialidad || q.especialidad, lugar: [o.nombre, o.direccion].filter(Boolean).join(', '), telefono: o.telefono || '', costo: o.precio || '' }); });
+      } catch (err) { out.innerHTML = `<div class="notice">${esc((err && err.message) || 'No se pudo buscar. Usa los enlaces de abajo.')}</div>`; }
+      finally { go.disabled = false; }
+    };
+  });
+}
+function openOpcion(id) {
+  const o = (S.opciones || []).find(x => x.id === id); if (!o) return;
+  openDialog(`${head(o.nombre)}
+    <dl class="facts"><dt>Especialidad</dt><dd>${esc(o.especialidad || '—')}</dd>${o.direccion ? `<dt>Dirección</dt><dd>${esc(o.direccion)}</dd>` : ''}${o.telefono ? `<dt>Teléfono</dt><dd class="mono">${esc(o.telefono)}</dd>` : ''}<dt>Precio</dt><dd>${esc(o.precio || 'No publicado')}</dd>${o.calificacion ? `<dt>Calificación</dt><dd>${esc(o.calificacion)}</dd>` : ''}<dt>Fuente</dt><dd style="overflow-wrap:anywhere">${esc(o.fuente || o.url)}</dd><dt>Guardada</dt><dd>${fmtDate(o.guardado)}</dd></dl>
+    <span class="chips"><a class="btn sm" href="${esc(o.url)}" target="_blank" rel="noopener">Ver</a>${o.telefono ? `<a class="btn sm" href="tel:${encodeURIComponent(o.telefono)}">Llamar</a>` : ''}<a class="btn sm" href="${RETHUS_URL}" target="_blank" rel="noopener">Verificar médico</a><a class="btn sm" href="${REPS_URL}" target="_blank" rel="noopener">Verificar clínica</a></span>
+    <div class="dlg-foot"><button class="btn ghost danger" id="op-del">Eliminar</button><button class="btn primary" id="op-book">Ya agendé</button></div>`, r => {
+    r.querySelector('#op-del').onclick = () => { dlg.close(); removeWithUndo('opciones', o.id, 'Opción eliminada'); };
+    r.querySelector('#op-book').onclick = () => openCitaForm({ miembroId: o.miembroId, tipo: 'particular', especialidad: o.especialidad, lugar: [o.nombre, o.direccion].filter(Boolean).join(', '), telefono: o.telefono, costo: o.precio });
+  });
+}
+
+// ---------- guías de trámites (verificadas) ----------
+const N1552 = ['Resolución 1552 de 2013', 'https://normograma.supersalud.gov.co/compilacion/docs/resolucion_minsaludps_1552_2013.htm'];
+const N1604 = ['Resolución 1604 de 2013', 'https://normograma.supersalud.gov.co/compilacion/docs/resolucion_minsaludps_1604_2013.htm'];
+const NPORT = ['Minsalud: portabilidad y movilidad', 'https://www.minsalud.gov.co/sites/rid/Lists/BibliotecaDigital/RIDE/VP/DOA/RL/plegable-de-portabiliad-y-movilidad.pdf'];
+const NMIP = ['Minsalud: MIPRES', 'https://www2.minsalud.gov.co/sites/rid/Lists/BibliotecaDigital/RIDE/VP/RBC/mipres-2024.pdf'];
+const NSUPER = ['Superintendencia de Salud', 'https://www.supersalud.gov.co'];
+const NCONST = ['Constitución, artículo 86', 'https://www.secretariasenado.gov.co/senado/basedoc/constitucion_politica_1991.html'];
+const GUIAS = [
+  { id: 'demora', titulo: 'Me demoran la cita', resumen: 'Plazos que la EPS debe cumplir y qué hacer si no los cumple.',
+    derechos: ['Medicina general y odontología general: la cita no puede asignarse a más de 3 días hábiles desde que la pides, salvo que tú pidas otra fecha (Res. 1552 de 2013, art. 1).', 'Especialistas: la EPS debe tener agendas abiertas todos los días hábiles del año y no puede negarse a recibir tu solicitud.', 'Si la cita necesita autorización previa, la EPS debe responder en máximo 5 días hábiles.', 'La EPS debe tener canales no presenciales para pedir citas, y publicar cada mes su tiempo promedio de espera.'],
+    pasos: ['Pide la cita por el canal oficial y anota fecha, hora y número de radicado', 'Si pasa el plazo, vuelve a pedirla por otro canal de la EPS', 'Radica una queja (PQRD) ante la EPS citando la Resolución 1552 de 2013', 'Si no responde, pon la queja ante la Superintendencia de Salud', 'Si la demora pone en riesgo la salud, considera una tutela'], fuentes: [N1552, NSUPER] },
+  { id: 'medicamentos', titulo: 'No me entregaron completos los medicamentos', resumen: 'La EPS tiene 48 horas para entregar lo pendiente.',
+    derechos: ['Si la farmacia no entrega todo al reclamar, la EPS debe entregar lo pendiente en máximo 48 horas, en tu casa o trabajo si tú lo autorizas (Res. 1604 de 2013, art. 1).', 'Si no autorizas el domicilio, te los entregan en sus puntos y deben dejar constancia.', 'Si la fórmula tiene errores o dudas, primero deben aclararla con el médico.'],
+    pasos: ['Pide en la farmacia el soporte de lo que quedó pendiente', 'Autoriza la entrega a domicilio y deja tu dirección y teléfono', 'Anota la hora en que reclamaste: desde ahí corren las 48 horas', 'Si pasan 48 horas, reclama a la EPS con el soporte', 'Si no responde, queja ante la Superintendencia de Salud'], fuentes: [N1604, NSUPER] },
+  { id: 'mipres', titulo: 'Medicamento o servicio que no está en el plan (MIPRES)', resumen: 'Cómo se piden medicamentos, insumos o servicios no financiados con la UPC.',
+    derechos: ['MIPRES es la herramienta del Ministerio de Salud donde el profesional tratante registra la prescripción de tecnologías no financiadas con la UPC y servicios complementarios.', 'Lo registra el médico (u otro profesional autorizado); la EPS gestiona la programación y la entrega.', 'Algunos casos, como las exclusiones excepcionales y ciertos insumos, requieren revisión de una junta de profesionales.'],
+    pasos: ['Pide al médico que formule en MIPRES y te dé el número de prescripción', 'Entrega ese número a la EPS por su canal oficial', 'Anota la fecha y pregunta cuándo y dónde te entregan', 'Haz seguimiento en Trámites hasta la entrega', 'Si lo niegan o no responden, PQRD, Supersalud o tutela'], fuentes: [NMIP, NSUPER] },
+  { id: 'portabilidad', titulo: 'Me voy temporalmente a otra ciudad (portabilidad)', resumen: 'Seguir atendido por tu EPS en otro municipio.',
+    derechos: ['Si te vas por trabajo, estudio u otra razón, tu EPS debe garantizarte atención en otro municipio (Decreto 1683 de 2013).', 'Hasta 1 mes: cualquier IPS con urgencias debe atenderte.', 'De 1 a 12 meses: la EPS debe asignarte una IPS primaria en el nuevo municipio con todo el plan de beneficios.', 'Puedes pedirlo por teléfono, escrito, correo o en persona; no pueden exigirte ir presencialmente.', 'Pasados 12 meses puedes pedir prórroga de un año; si es definitivo, debes trasladarte de EPS.'],
+    pasos: ['Pide la portabilidad a tu EPS por teléfono, correo o su web', 'Da nombre, documento, municipio de destino, tiempo, teléfono, dirección y correo', 'Anota el número de radicado', 'Pregunta qué IPS te asignaron en el nuevo municipio', 'Guarda la IPS asignada en las notas de la persona'], fuentes: [NPORT] },
+  { id: 'traslado', titulo: 'Quiero cambiarme de EPS', resumen: 'Traslado y movilidad entre regímenes.',
+    derechos: ['Puedes cambiar de EPS después de 12 meses en la misma, o cuando cambias de municipio.', 'Movilidad: puedes pasar entre régimen subsidiado y contributivo sin cambiar de EPS cuando cambian tus condiciones.', 'El cambio de EPS en el mismo régimen se puede reportar en línea en Mi Seguridad Social, el portal del Ministerio de Salud.'],
+    pasos: ['Verifica tu EPS actual y tu fecha de afiliación en ADRES o Mi Seguridad Social', 'Compara las EPS de tu municipio (red de clínicas y canales)', 'Regístrate en miseguridadsocial.gov.co y reporta el traslado, o hazlo en la nueva EPS', 'Incluye a tu grupo familiar en el traslado', 'Actualiza la EPS de cada persona en Familia'], fuentes: [NPORT, ['Mi Seguridad Social', 'https://www.miseguridadsocial.gov.co/']] },
+  { id: 'incapacidad', titulo: 'Incapacidad médica', resumen: 'Quién paga y qué entregar.',
+    derechos: ['Por enfermedad general, el empleador paga los 2 primeros días de incapacidad y la EPS desde el tercer día (Decreto 2943 de 2013).', 'Si te la expidió un médico particular, pregunta a tu EPS si debe validarse o transcribirse.'],
+    pasos: ['Pide la incapacidad completa: fechas, diagnóstico codificado y firma', 'Entrégala a tu empleador o área de nómina el mismo día', 'Si es de más de 2 días, confirma que el empleador la radique ante la EPS', 'Guarda copia y anota las fechas en la cita'], fuentes: [['Actualícese: incapacidad a cargo del empleador', 'https://actualicese.com/archivo/incapacidad-laboral-durante-los-dos-primeros-dias-a-cargo-del-empleador/']] },
+  { id: 'cirugia', titulo: 'Cirugía o procedimiento programado', resumen: 'La ruta completa, de la orden al día de la cirugía.',
+    derechos: ['Si requiere autorización previa, la EPS debe responder en máximo 5 días hábiles (Res. 1552 de 2013).', 'Tienes derecho a que te expliquen el procedimiento y a firmar el consentimiento informado antes.'],
+    pasos: ['Guarda la orden del especialista en Órdenes con su vencimiento', 'Solicita la autorización a la EPS y anota el radicado', 'Agenda la valoración prequirúrgica y la de anestesia', 'Hazte los exámenes que pidan y guarda los resultados', 'Confirma fecha, hora, sede, ayuno y qué llevar', 'Define quién acompaña y cómo vuelven a casa', 'Pide la incapacidad y las indicaciones de recuperación', 'Agenda el control posoperatorio'], fuentes: [N1552] },
+  { id: 'tutela', titulo: 'Acción de tutela en salud', resumen: 'Cuándo y cómo, sin abogado.',
+    derechos: ['La tutela protege derechos fundamentales como la salud cuando son vulnerados o amenazados.', 'No necesitas abogado. Entre la solicitud y la decisión del juez no pueden pasar más de 10 días (Constitución, art. 86).'],
+    pasos: ['Reúne la orden médica, la historia o resumen clínico y tu documento', 'Reúne la negación de la EPS o la queja (PQRD) sin respuesta', 'Escribe qué necesitas, qué pasó y por qué afecta tu salud', 'Preséntala ante un juez (oficina de reparto) o por los canales en línea de la Rama Judicial', 'Anota el número de radicado y haz seguimiento'], fuentes: [NCONST] },
+  { id: 'verificar', titulo: 'Verificar un médico o una clínica', resumen: 'Antes de pagar una consulta particular.',
+    derechos: ['Todo profesional de salud debe estar inscrito en el ReTHUS para ejercer en Colombia; la consulta muestra si está registrado y si tiene sanciones.', 'Las clínicas y consultorios deben estar inscritos en el REPS con los servicios que prestan habilitados.'],
+    pasos: ['Busca al profesional en ReTHUS con su nombre o documento', 'Busca la sede en el REPS y revisa que el servicio esté habilitado', 'Pregunta el precio total antes de ir y pide factura', 'Guarda la opción en Salud > Particulares'], fuentes: [['ReTHUS (SISPRO)', RETHUS_URL], ['REPS (Minsalud)', REPS_URL]] },
+];
+function openGuia(id) {
+  const g = GUIAS.find(x => x.id === id); if (!g) return;
+  openDialog(`${head(g.titulo)}
+    <div class="answer" style="margin:0"><b style="color:var(--ai)">Tus derechos</b>${g.derechos.map(d => `<span class="small">• ${esc(d)}</span>`).join('')}</div>
+    <div><b>Paso a paso</b><ol style="margin:6px 0 0;padding-left:1.2em;display:grid;gap:4px">${g.pasos.map(p => `<li class="small">${esc(p)}</li>`).join('')}</ol></div>
+    <div class="small muted">Fuentes: ${g.fuentes.map(([l, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`).join(' · ')}. Guía general, no es asesoría legal.</div>
+    ${S.miembros.length ? `<label class="f">¿Para quién es este trámite?<select id="gu-m">${memberOptions()}</select></label>` : ''}
+    <div class="dlg-foot">${id === 'demora' ? '<button class="btn" id="gu-ped">Ver canales de la EPS</button>' : ''}${S.miembros.length ? '<button class="btn primary" id="gu-go">Empezar este trámite</button>' : ''}</div>`, r => {
+    r.querySelector('#gu-ped')?.addEventListener('click', () => openPedir({ miembroId: val(r, 'gu-m') }));
+    r.querySelector('#gu-go')?.addEventListener('click', () => {
+      S.sols.push({ id: uid(), miembroId: val(r, 'gu-m'), que: g.titulo, canal: 'guía', fecha: todayISO(), estado: 'esperando', radicado: '', guia: g.id, pasos: g.pasos.map(t => ({ t, ok: false })) });
+      persist(); dlg.close(); view = 'salud'; salud = 'tramites'; render(); toast('Trámite creado. Marca cada paso al hacerlo.');
+    });
+  });
+}
+
 // ---------- quick add sheet ----------
 function openPlus() {
   if (!S.miembros.length) { openMember(); return; }
@@ -1210,6 +1448,8 @@ function openPlus() {
     ${opt('pl-pedir', 'cal', 'Pedir una cita', 'Te mostramos cómo pedirla en tu EPS y qué decir.', true)}
     ${opt('pl-cita', 'check', 'Ya tengo una cita: guardarla', 'Fecha, hora, lugar y qué llevar.')}
     ${photoOn() ? opt('pl-foto', 'doc', 'Leer una foto o mensaje de la EPS', 'Toma foto a la orden o pega el SMS y llenamos la cita.') : ''}
+    ${opt('pl-part', 'spark', 'Buscar una cita particular', 'Opciones con precio y calificaciones, y cómo verificar al médico.')}
+    ${opt('pl-guia', 'alert', 'Un trámite difícil con la EPS', 'Medicamentos pendientes, MIPRES, cirugía, tutela y más.')}
     ${opt('pl-aut', 'doc', 'Guardar una orden o autorización', 'Te avisamos antes de que se venza.')}
     ${opt('pl-ctl', 'pulse', 'Anotar un control', '“Control en 3 meses”: te avisamos cuándo pedirlo.')}
     ${opt('pl-med', 'pill', 'Anotar un medicamento', 'Te recordamos la próxima entrega.')}`, r => {
@@ -1217,6 +1457,8 @@ function openPlus() {
     r.querySelector('#pl-cita').onclick = () => openCitaForm();
     r.querySelector('#pl-foto')?.addEventListener('click', () => openCitaForm({ photo: true }));
     r.querySelector('#pl-aut').onclick = () => openAut();
+    r.querySelector('#pl-part').onclick = () => openParticular();
+    r.querySelector('#pl-guia').onclick = () => { dlg.close(); go('salud', 'guias'); };
     r.querySelector('#pl-ctl').onclick = () => openCtl();
     r.querySelector('#pl-med').onclick = () => openMed();
   });
@@ -1248,12 +1490,14 @@ function openPedir(pre = {}) {
       <div class="fields"><label class="f">¿Para quién?<select id="pd-m">${memberOptions(mid)}</select></label><label class="f">¿Qué cita?<input id="pd-que" value="${esc(que)}" placeholder="Ej.: Medicina general"></label></div>
       ${channelsHTML(m, que, pre)}
       <div class="answer" style="margin:0"><b style="color:var(--ai)">Qué decir</b><p id="pd-script">${esc(scriptFor(m, que, pre))}</p><div class="row"><span class="small muted grow">Ten a mano el documento${pre.numero ? ' y la autorización' : ''}.</span><button class="btn sm" id="pd-copy">${ic('copy')} Copiar</button></div></div>
+      <button class="btn ghost sm" id="pd-part" style="width:fit-content">${ic('spark')} ¿Muy demorada? Buscar opción particular</button>
       <div class="dlg-foot"><button class="btn" id="pd-wait">Quedó pendiente</button><button class="btn primary" id="pd-got">${ic('check')} Ya me dieron la cita</button></div>`, r => {
       r.querySelector('#pd-m').onchange = e => { mid = e.target.value; draw(); };
       r.querySelector('#pd-que').oninput = e => { const t = scriptFor(member(mid), e.target.value.trim(), pre); r.querySelector('#pd-script').textContent = t; const wa = r.querySelector('#pd-wa'); if (wa) wa.href = `https://wa.me/${wa.dataset.wa}?text=${encodeURIComponent(t)}`; };
       r.querySelectorAll('[data-ch]').forEach(a => a.addEventListener('click', () => { lastCh = a.dataset.ch; }));
       r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
       r.querySelector('#pd-copy').onclick = () => copyText(r.querySelector('#pd-script').textContent);
+      r.querySelector('#pd-part').onclick = () => openParticular({ miembroId: mid, especialidad: val(r, 'pd-que') });
       r.querySelector('#pd-got').onclick = () => openCitaForm({ miembroId: mid, especialidad: val(r, 'pd-que') || pre.especialidad || '', controlId: pre.controlId, autId: pre.autId, fecha: addDays(todayISO(), 1) });
       r.querySelector('#pd-wait').onclick = () => {
         S.sols.push({ id: uid(), miembroId: mid, que: val(r, 'pd-que') || 'Cita', canal: lastCh || 'teléfono', fecha: todayISO(), estado: 'esperando', radicado: '', controlId: pre.controlId || null, autId: pre.autId || null });
@@ -1269,10 +1513,14 @@ function openSol(id) {
   const x = S.sols.find(y => y.id === id); if (!x) return; const m = member(x.miembroId); const n = -daysUntil(x.fecha);
   openDialog(`${head(x.que)}
     <dl class="facts"><dt>Para</dt><dd>${esc(m?.nombre || '—')}</dd><dt>Pedida</dt><dd>${esc(fmtLong(x.fecha))} (${relDays(-n)}) por ${esc(x.canal)}</dd><dt>Estado</dt><dd>${x.estado === 'esperando' ? 'Esperando respuesta' : 'Resuelta'}</dd></dl>
+    ${(x.pasos || []).length ? `<div><b>Pasos</b><div class="checklist" style="margin-top:6px">${x.pasos.map((p, i) => `<label class="${p.ok ? 'ok' : ''}"><input type="checkbox" data-paso="${i}" ${p.ok ? 'checked' : ''}><span>${esc(p.t)}</span></label>`).join('')}</div></div>` : ''}
+    ${x.guia ? `<button class="btn ghost sm" id="sl-guia" style="width:fit-content">Ver la guía completa</button>` : ''}
     <label class="f">Número de radicado o solicitud<input id="sl-rad" value="${esc(x.radicado || '')}" placeholder="Si te dieron uno, anótalo"></label>
     ${x.estado === 'esperando' ? `<div class="actions"><button class="btn sm" id="sl-again">Volver a pedirla</button><button class="btn sm" id="sl-help">No me responden: qué hago</button></div>` : ''}
     <div class="dlg-foot"><button class="btn ghost danger" id="sl-del">Eliminar</button><button class="btn" id="sl-save">Guardar</button>${x.estado === 'esperando' ? `<button class="btn primary" id="sl-got">${ic('check')} Ya me la dieron</button>` : ''}</div>`, r => {
     const saveRad = () => { x.radicado = val(r, 'sl-rad'); persist(); };
+    r.querySelectorAll('[data-paso]').forEach(cb => cb.onchange = () => { x.pasos[+cb.dataset.paso].ok = cb.checked; cb.closest('label').classList.toggle('ok', cb.checked); persist(); render(); });
+    r.querySelector('#sl-guia')?.addEventListener('click', () => openGuia(x.guia));
     r.querySelector('#sl-save').onclick = () => { saveRad(); dlg.close(); render(); toast('Guardado'); };
     r.querySelector('#sl-del').onclick = () => { dlg.close(); removeWithUndo('sols', x.id, 'Trámite eliminado'); };
     r.querySelector('#sl-again')?.addEventListener('click', () => { saveRad(); openPedir({ miembroId: x.miembroId, que: x.que, controlId: x.controlId, autId: x.autId }); });
