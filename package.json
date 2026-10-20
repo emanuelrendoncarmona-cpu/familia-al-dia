@@ -1,0 +1,13 @@
+{
+  "name": "familia-al-dia",
+  "private": true,
+  "type": "module",
+  "description": "Familia al Día: citas, órdenes, controles y medicamentos de la familia en un solo lugar.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@netlify/blobs": "^11.1.4",
+    "@netlify/functions": "^6.0.3",
+    "@netlify/identity": "^2.0.0"
+  },
+  "engines": { "node": ">=20" }
+}
