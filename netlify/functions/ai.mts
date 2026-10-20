@@ -111,9 +111,23 @@ Prioriza: (1) clínicas, IPS y consultorios con sitio oficial o perfil en direct
 REGLAS: solo incluye datos que aparezcan en los resultados de búsqueda; nunca inventes precios, teléfonos ni calificaciones (usa null si no aparecen). Los precios cambian: dilo tal como aparece y con su fuente.
 Responde SOLO con JSON: {"opciones":[{"nombre":string,"tipo":"medico"|"clinica"|"telemedicina","especialidad":string,"direccion":string|null,"ciudad":string|null,"telefono":string|null,"precio":string|null,"calificacion":string|null,"como_agendar":string|null,"url":string,"fuente":string}], "consejos":[string, string]} con máximo 6 opciones ordenadas de la mejor a la menos recomendada.`;
       try {
-        const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 2500, system, messages: [{ role: "user", content: `Busca opciones particulares de ${esp} en ${ciudad}.` }], tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 } as any] } as any);
-        const text = msg.content.map((b: any) => (b.type === "text" ? b.text : "")).join("");
-        const out = parseJSON(text);
+        const tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 3 } as any];
+        const messages: any[] = [{ role: "user", content: `Busca opciones particulares de ${esp} en ${ciudad}.` }];
+        let msg: any;
+        for (let turn = 0; turn < 3; turn++) {
+          msg = await anthropic.messages.create({ model: MODEL, max_tokens: 2500, system, messages, tools } as any);
+          if (msg.stop_reason !== "pause_turn") break;
+          messages.push({ role: "assistant", content: msg.content });
+        }
+        const blocks = (msg.content || []).filter((b: any) => b.type === "text");
+        const text = blocks.map((b: any) => b.text).join("");
+        const cites = [...new Map(blocks.flatMap((b: any) => b.citations || []).filter((c: any) => c.url).map((c: any) => [c.url, `${c.title || ""} — ${c.url}`])).values()];
+        let out: any;
+        try { out = parseJSON(text); } catch {
+          console.warn("[ai particular] formateando", msg.stop_reason, text.length, cites.length);
+          const fmt = await anthropic.messages.create({ model: MODEL, max_tokens: 2000, system: `Convierte la información a JSON válido con esta forma exacta: {"opciones":[{"nombre":string,"tipo":"medico"|"clinica"|"telemedicina","especialidad":string,"direccion":string|null,"ciudad":string|null,"telefono":string|null,"precio":string|null,"calificacion":string|null,"como_agendar":string|null,"url":string,"fuente":string}],"consejos":[string,string]}. Usa SOLO datos que estén en el texto o las fuentes; null si falta un dato; "url" debe ser una de las fuentes. Responde únicamente el JSON.`, messages: [{ role: "user", content: `${text}\n\nFuentes:\n${cites.join("\n")}` }] });
+          out = parseJSON(fmt.content.map((b: any) => (b.type === "text" ? b.text : "")).join(""));
+        }
         out.opciones = (Array.isArray(out.opciones) ? out.opciones : []).filter((o: any) => o && o.nombre && /^https?:\/\//.test(String(o.url || ""))).slice(0, 6);
         return json(out);
       } catch (e: any) {
