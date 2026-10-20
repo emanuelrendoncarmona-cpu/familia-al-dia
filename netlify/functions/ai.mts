@@ -48,7 +48,7 @@ export default async (req: Request) => {
   const owner = fam.miembros.find(m => m.userId === fam.ownerId) || { userId: fam.ownerId, email: "" };
   const estado = estadoCuenta(await getCuenta({ id: owner.userId, email: owner.email }));
   if (!estado.activo) return json({ error: "Tu prueba gratis terminó. Activa tu plan para usar el asistente.", code: "plan_vencido" }, 402);
-  if (!process.env.ANTHROPIC_BASE_URL && !process.env.ANTHROPIC_API_KEY) return json({ error: "El asistente aún no está activo en el servidor." }, 503);
+  if (!process.env.ANTHROPIC_BASE_URL && !process.env.ANTHROPIC_API_KEY) return json({ error: "El asistente se está actualizando. Intenta de nuevo en un minuto." }, 503);
   if (!(await checkQuota(user.id))) return json({ error: `Llegaste al límite de ${AI_DAILY_LIMIT} consultas de hoy. Mañana se renueva.`, code: "limite" }, 429);
 
   let body: any;
@@ -60,7 +60,7 @@ export default async (req: Request) => {
   try {
     if (mode === "ayuda") {
       const q = String(body.q || "").slice(0, 1500);
-      const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 500, system: HELP, messages: [{ role: "user", content: q }] });
+      const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 4000, output_config: { effort: "low" }, system: HELP, messages: [{ role: "user", content: q }] });
       const text = msg.content.map((b: any) => (b.type === "text" ? b.text : "")).join("").trim();
       return json({ texto: text });
     }
@@ -76,7 +76,7 @@ Devuelve SOLO un objeto JSON con UNA acción:
 - Guardar medicamento: {"accion":"medicamento","persona":...,"nombre":string,"dosis":string o null,"frecuencia":string o null,"proxima":"YYYY-MM-DD" o null}
 - Pregunta: {"accion":"respuesta","texto":"máximo 5 líneas, basada SOLO en los datos"}
 Interpreta fechas relativas desde hoy. "Mi mamá", "mi papá" se emparejan por parentesco. No inventes datos.`;
-      const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 700, system, messages: [{ role: "user", content: `Datos de la familia: ${ctx}\n\nEl usuario escribió: """${q}"""` }] });
+      const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 4000, output_config: { effort: "low" }, system, messages: [{ role: "user", content: `Datos de la familia: ${ctx}\n\nEl usuario escribió: """${q}"""` }] });
       const text = msg.content.map((b: any) => (b.type === "text" ? b.text : "")).join("");
       return json(parseJSON(text));
     }
@@ -93,7 +93,7 @@ Interpreta fechas relativas desde hoy. "Mi mamá", "mi papá" se emparejan por p
       content.push({ type: "text", text: `Extrae los datos de una cita o de una orden médica/autorización a partir de ${body.image ? "la imagen adjunta (orden médica, autorización o captura de un mensaje)" : "este mensaje"}${text ? (body.image ? " y este texto:\n" : ":\n") + text : ""}
 Contexto: Colombia, hoy es ${hoy}. Personas de la familia: ${personas.join(", ") || "(sin datos)"}. Tipos válidos: ${TIPOS}.
 Devuelve SOLO JSON: {"persona": nombre exacto de la lista o null, "tipo", "especialidad", "fecha":"YYYY-MM-DD" o null (si no hay año, el próximo que ocurra), "hora":"HH:MM" o null, "lugar", "profesional", "requisitos":[...], "autorizacion":{"numero","vence"} o null}. Usa null si un dato no aparece. No inventes.` });
-      const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 700, messages: [{ role: "user", content }] });
+      const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 4000, output_config: { effort: "low" }, messages: [{ role: "user", content }] });
       const out = msg.content.map((b: any) => (b.type === "text" ? b.text : "")).join("");
       return json(parseJSON(out));
     }
@@ -115,7 +115,7 @@ Haz búsquedas distintas (por ejemplo: "${esp} particular ${ciudad} precio consu
         const messages: any[] = [{ role: "user", content: `Busca opciones particulares de ${esp} en ${ciudad}.` }];
         let msg: any;
         for (let turn = 0; turn < 3; turn++) {
-          msg = await anthropic.messages.create({ model: MODEL, max_tokens: 2500, system, messages, tools } as any);
+          msg = await anthropic.messages.create({ model: MODEL, max_tokens: 10000, output_config: { effort: "low" }, system, messages, tools } as any);
           if (msg.stop_reason !== "pause_turn") break;
           messages.push({ role: "assistant", content: msg.content });
         }
@@ -127,7 +127,7 @@ Haz búsquedas distintas (por ejemplo: "${esp} particular ${ciudad} precio consu
         const diag = { stop: msg.stop_reason, tipos: content.map((b: any) => b.type).join(","), texto: text.length, fuentes: cites.length };
         console.log("[ai particular]", JSON.stringify(diag));
         if (!text && !cites.length) return json({ error: "No encontramos resultados en internet para esa búsqueda. Prueba con otra especialidad o ciudad, o usa los enlaces de abajo.", code: "sin_resultados", diag }, 200);
-        const fmt = await anthropic.messages.create({ model: MODEL, max_tokens: 2000, system: `Convierte la información a JSON válido con esta forma exacta: {"opciones":[{"nombre":string,"tipo":"medico"|"clinica"|"telemedicina","especialidad":string,"direccion":string|null,"ciudad":string|null,"telefono":string|null,"precio":string|null,"calificacion":string|null,"como_agendar":string|null,"url":string,"fuente":string}],"consejos":[string,string]}. Usa SOLO datos que estén en el texto o en la lista de fuentes; null si falta un dato; nunca inventes precios, teléfonos ni calificaciones. "precio" corto, por ejemplo "Desde $250.000" o "$180.000". "calificacion" corta, por ejemplo "4,8 de 5 (120 opiniones)" o "27 opiniones", o null. "url" debe ser una de las fuentes y "fuente" su dominio. Si solo hay fuentes sin texto, crea una opción por cada fuente que sea un médico, clínica o directorio de salud de ${ciudad || "Colombia"} relacionado con ${esp}. Máximo 6 opciones. Responde únicamente el JSON.`, messages: [{ role: "user", content: `${text || "(sin texto)"}\n\nFuentes:\n${cites.join("\n")}` }] });
+        const fmt = await anthropic.messages.create({ model: MODEL, max_tokens: 6000, output_config: { effort: "low" }, system: `Convierte la información a JSON válido con esta forma exacta: {"opciones":[{"nombre":string,"tipo":"medico"|"clinica"|"telemedicina","especialidad":string,"direccion":string|null,"ciudad":string|null,"telefono":string|null,"precio":string|null,"calificacion":string|null,"como_agendar":string|null,"url":string,"fuente":string}],"consejos":[string,string]}. Usa SOLO datos que estén en el texto o en la lista de fuentes; null si falta un dato; nunca inventes precios, teléfonos ni calificaciones. "precio" corto, por ejemplo "Desde $250.000" o "$180.000". "calificacion" corta, por ejemplo "4,8 de 5 (120 opiniones)" o "27 opiniones", o null. "url" debe ser una de las fuentes y "fuente" su dominio. Si solo hay fuentes sin texto, crea una opción por cada fuente que sea un médico, clínica o directorio de salud de ${ciudad || "Colombia"} relacionado con ${esp}. Máximo 6 opciones. Responde únicamente el JSON.`, messages: [{ role: "user", content: `${text || "(sin texto)"}\n\nFuentes:\n${cites.join("\n")}` }] });
         const out: any = parseJSON(fmt.content.map((b: any) => (b.type === "text" ? b.text : "")).join(""));
         out.opciones = (Array.isArray(out.opciones) ? out.opciones : []).filter((o: any) => o && o.nombre && /^https?:\/\//.test(String(o.url || ""))).slice(0, 6);
         return json({ ...out, diag });
