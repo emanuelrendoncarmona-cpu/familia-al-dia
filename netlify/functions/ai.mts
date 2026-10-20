@@ -109,7 +109,7 @@ Devuelve SOLO JSON: {"persona": nombre exacto de la lista o null, "tipo", "espec
 Busca opciones reales y vigentes para: ${esp} en ${ciudad || "Colombia"}; modalidad: ${modalidad}${presupuesto ? "; presupuesto aproximado: " + presupuesto : ""}${motivo ? "; contexto administrativo: " + motivo : ""}.
 Prioriza: (1) clínicas, IPS y consultorios con sitio oficial o perfil en directorios reconocidos (como Doctoralia), (2) opciones con precio de consulta publicado, (3) buenas calificaciones con número de opiniones, (4) facilidad para agendar en línea o por WhatsApp.
 REGLAS: solo incluye datos que aparezcan en los resultados de búsqueda; nunca inventes precios, teléfonos ni calificaciones (usa null si no aparecen). Los precios cambian: dilo tal como aparece y con su fuente.
-Responde SOLO con JSON: {"opciones":[{"nombre":string,"tipo":"medico"|"clinica"|"telemedicina","especialidad":string,"direccion":string|null,"ciudad":string|null,"telefono":string|null,"precio":string|null,"calificacion":string|null,"como_agendar":string|null,"url":string,"fuente":string}], "consejos":[string, string]} con máximo 6 opciones ordenadas de la mejor a la menos recomendada.`;
+Después de buscar, escribe una lista de máximo 6 opciones, de la mejor a la menos recomendada. Para cada una: nombre, tipo (médico, clínica o telemedicina), especialidad, dirección, teléfono, precio de consulta, calificación, cómo agendar y el enlace (URL) de la fuente. Al final da 2 consejos prácticos para pedir la cita particular.`;
       try {
         const tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 3 } as any];
         const messages: any[] = [{ role: "user", content: `Busca opciones particulares de ${esp} en ${ciudad}.` }];
@@ -119,17 +119,18 @@ Responde SOLO con JSON: {"opciones":[{"nombre":string,"tipo":"medico"|"clinica"|
           if (msg.stop_reason !== "pause_turn") break;
           messages.push({ role: "assistant", content: msg.content });
         }
-        const blocks = (msg.content || []).filter((b: any) => b.type === "text");
-        const text = blocks.map((b: any) => b.text).join("");
-        const cites = [...new Map(blocks.flatMap((b: any) => b.citations || []).filter((c: any) => c.url).map((c: any) => [c.url, `${c.title || ""} — ${c.url}`])).values()];
-        let out: any;
-        try { out = parseJSON(text); } catch {
-          console.warn("[ai particular] formateando", msg.stop_reason, text.length, cites.length);
-          const fmt = await anthropic.messages.create({ model: MODEL, max_tokens: 2000, system: `Convierte la información a JSON válido con esta forma exacta: {"opciones":[{"nombre":string,"tipo":"medico"|"clinica"|"telemedicina","especialidad":string,"direccion":string|null,"ciudad":string|null,"telefono":string|null,"precio":string|null,"calificacion":string|null,"como_agendar":string|null,"url":string,"fuente":string}],"consejos":[string,string]}. Usa SOLO datos que estén en el texto o las fuentes; null si falta un dato; "url" debe ser una de las fuentes. Responde únicamente el JSON.`, messages: [{ role: "user", content: `${text}\n\nFuentes:\n${cites.join("\n")}` }] });
-          out = parseJSON(fmt.content.map((b: any) => (b.type === "text" ? b.text : "")).join(""));
-        }
+        const content: any[] = messages.slice(1).flatMap((m: any) => m.content).concat(msg.content || []);
+        const blocks = content.filter((b: any) => b.type === "text");
+        const text = blocks.map((b: any) => b.text).join("").trim();
+        const found = content.filter((b: any) => b.type === "web_search_tool_result" && Array.isArray(b.content)).flatMap((b: any) => b.content).filter((r: any) => r.url).map((r: any) => `${r.title || ""} — ${r.url}`);
+        const cites = [...new Set([...blocks.flatMap((b: any) => b.citations || []).filter((c: any) => c.url).map((c: any) => `${c.title || ""} — ${c.url}`), ...found])].slice(0, 30);
+        const diag = { stop: msg.stop_reason, tipos: content.map((b: any) => b.type).join(","), texto: text.length, fuentes: cites.length };
+        console.log("[ai particular]", JSON.stringify(diag));
+        if (!text && !cites.length) return json({ error: "No encontramos resultados en internet para esa búsqueda. Prueba con otra especialidad o ciudad, o usa los enlaces de abajo.", code: "sin_resultados", diag }, 200);
+        const fmt = await anthropic.messages.create({ model: MODEL, max_tokens: 2000, system: `Convierte la información a JSON válido con esta forma exacta: {"opciones":[{"nombre":string,"tipo":"medico"|"clinica"|"telemedicina","especialidad":string,"direccion":string|null,"ciudad":string|null,"telefono":string|null,"precio":string|null,"calificacion":string|null,"como_agendar":string|null,"url":string,"fuente":string}],"consejos":[string,string]}. Usa SOLO datos que estén en el texto o en la lista de fuentes; null si falta un dato; nunca inventes precios, teléfonos ni calificaciones. "url" debe ser una de las fuentes y "fuente" su dominio. Si solo hay fuentes sin texto, crea una opción por cada fuente que sea un médico, clínica o directorio de salud de ${ciudad || "Colombia"} relacionado con ${esp}. Máximo 6 opciones. Responde únicamente el JSON.`, messages: [{ role: "user", content: `${text || "(sin texto)"}\n\nFuentes:\n${cites.join("\n")}` }] });
+        const out: any = parseJSON(fmt.content.map((b: any) => (b.type === "text" ? b.text : "")).join(""));
         out.opciones = (Array.isArray(out.opciones) ? out.opciones : []).filter((o: any) => o && o.nombre && /^https?:\/\//.test(String(o.url || ""))).slice(0, 6);
-        return json(out);
+        return json({ ...out, diag });
       } catch (e: any) {
         console.error("[ai particular]", e?.status, e?.message);
         return json({ error: "La búsqueda en internet no está disponible en este momento. Usa los enlaces de búsqueda de abajo.", code: "sin_busqueda" }, 503);
