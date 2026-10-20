@@ -69,4 +69,4 @@ export default async (req: Request) => {
   return json({ error: "Acción desconocida." }, 400);
 };
 
-export const config: Config = { path: "/api/family", method: "POST" };
+export const config: Config = { path: "/api/family", method: "POST", rateLimit: { windowLimit: 20, windowSize: 60, aggregateBy: ["ip", "domain"] } };

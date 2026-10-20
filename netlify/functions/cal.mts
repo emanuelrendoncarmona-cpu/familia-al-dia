@@ -41,4 +41,4 @@ export default async (req: Request, context: Context) => {
   return new Response(L.join("\r\n") + "\r\n", { headers: { "content-type": "text/calendar; charset=utf-8", "cache-control": "no-store", "content-disposition": "inline; filename=familia-al-dia.ics" } });
 };
 
-export const config: Config = { path: "/api/cal/:token", method: "GET" };
+export const config: Config = { path: "/api/cal/:token", method: "GET", rateLimit: { windowLimit: 60, windowSize: 60, aggregateBy: ["ip", "domain"] } };

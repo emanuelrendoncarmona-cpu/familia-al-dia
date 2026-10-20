@@ -48,4 +48,4 @@ export default async (req: Request) => {
   return json({ error: "Método no permitido" }, 405);
 };
 
-export const config: Config = { path: "/api/data", method: ["GET", "PUT", "DELETE"] };
+export const config: Config = { path: "/api/data", method: ["GET", "PUT", "DELETE"], rateLimit: { windowLimit: 120, windowSize: 60, aggregateBy: ["ip", "domain"] } };
