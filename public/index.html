@@ -185,6 +185,14 @@ nav.dock .dotn{position:absolute;top:6px;right:calc(50% - 18px);width:8px;height
 .empty{background:var(--glass);border:1px dashed var(--line);border-radius:var(--r);padding:26px 18px;text-align:center;display:grid;gap:10px;justify-items:center}
 .onboard{background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:28px;padding:26px;display:grid;gap:16px;margin-top:16px;box-shadow:var(--shadow)}
 .onboard h2{font-size:1.75rem}
+.qa{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.qa button{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--glass);border-radius:18px;padding:14px;color:var(--text);font:inherit;cursor:pointer;min-height:72px}
+.qa button b{font-family:var(--display);font-size:1rem;line-height:1.2}
+.qa button small{grid-column:2;color:var(--muted);font-size:.8125rem;line-height:1.3}
+.qa button .i{grid-row:span 2;width:26px;height:26px}
+.qa button.hot{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.qa button.hot .i{color:var(--accent-text)}
+@media (max-width:360px){.qa{grid-template-columns:minmax(0,1fr)}}
 .feat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .feat div{background:var(--sunk);border-radius:14px;padding:12px;font-size:.875rem;display:grid;gap:4px}
 .feat b{font-family:var(--display)}
@@ -681,7 +689,8 @@ function inicioHTML() {
       <span class="meta">${esc(next.lugar || 'Lugar por confirmar')}${next.acompana ? ' · acompaña ' + esc(next.acompana) : ''}</span>
       <div class="actions"><button class="btn primary" data-cita="${next.id}">${ic('check')} Alistar</button><a class="btn" href="${esc(gcalUrl(next))}" target="_blank" rel="noopener">${ic('google')} A mi calendario</a><a class="btn" href="${esc(waUrl(next))}" target="_blank" rel="noopener">${ic('share')} WhatsApp</a></div></div></div>`;
   } else hero = `<div class="empty" style="margin-top:14px"><b>No hay citas próximas</b><span class="muted small">Escribe arriba algo como “cita de odontología el lunes a las 9”, o pide una a tu EPS.</span><button class="btn primary" data-act="pedir">${ic('cal')} Pedir una cita</button></div>`;
-  return askHTML() + hero + stripHTML() +
+  const qa = `<div class="qa"><button data-act="pedir">${ic('cal')}<b>Pedir cita a la EPS</b><small>Canales oficiales y qué decir</small></button><button class="hot" data-act="particular">${ic('spark')}<b>Cita particular</b><small>Opciones con precio y calificación</small></button></div>`;
+  return askHTML() + qa + hero + stripHTML() +
     `<div class="sec"><div class="sec-head"><h2>Atención</h2>${al.length ? `<span class="badge ${al.some(a => a.lvl === 'crit') ? 'crit' : 'warn'}">${al.length} ${al.length === 1 ? 'aviso' : 'avisos'}</span>` : ''}</div>
     ${al.length ? al.slice(0, 6).map((a, i) => `<div class="alert ${a.lvl}"><span class="ic">${ic(a.k)}</span><div class="txt"><b>${esc(a.title)}</b><span class="small muted">${esc(a.sub)}</span></div><button class="btn sm" data-alert="${i}">${esc(a.act[0])}</button></div>`).join('') : `<div class="card"><b>Todo en orden</b><span class="small muted">No hay autorizaciones por vencer ni controles atrasados.</span></div>`}</div>
     ${up.length > 1 ? `<div class="sec"><div class="sec-head"><h2>Después</h2><button class="btn ghost sm" data-go2="agenda">Ver agenda completa</button></div>${up.slice(1, 4).map(citaCard).join('')}</div>` : ''}`;
@@ -760,7 +769,7 @@ function familiaHTML() {
     return `<div class="card member"><span class="avatar" style="background:${mColor(m)}">${esc(initials(m.nombre))}</span>
       <span class="main"><span class="row"><b class="grow">${esc(m.nombre)}</b><span class="badge">${esc(m.parentesco || '')}</span></span>
       <dl class="facts"><dt>EPS</dt><dd>${esc(m.eps || '—')}${m.regimen ? ' · ' + esc(m.regimen) : ''}</dd><dt>Documento</dt><dd class="mono">${esc(m.doc || '—')}</dd>${m.alergias ? `<dt>Alergias</dt><dd><span class="badge crit">${esc(m.alergias)}</span></dd>` : ''}<dt>Próxima</dt><dd>${prox ? `${esc(citaTitle(prox))}, ${fmtDate(prox.fecha)}` : 'Sin citas'}</dd><dt>Órdenes</dt><dd>${pend} ${pend === 1 ? 'vigente' : 'vigentes'}</dd></dl>
-      <div class="actions"><button class="btn sm primary" data-pedir="${m.id}">${ic('cal')} Pedir cita${e ? ' a ' + esc(e.n) : ''}</button><button class="btn sm" data-member="${m.id}">Editar</button></div></span></div>`;
+      <div class="actions"><button class="btn sm primary" data-pedir="${m.id}">${ic('cal')} Pedir cita${e ? ' a ' + esc(e.n) : ''}</button><button class="btn sm" data-part="${m.id}">${ic('spark')} Particular</button><button class="btn sm" data-member="${m.id}">Editar</button></div></span></div>`;
   }).join('') : `<div class="empty"><b>Aún no hay nadie</b><span class="muted small">Agrega a las personas cuyas citas organizas.</span></div>`}</div>
   ${mode === 'netlify' && famInfo ? accessHTML() : ''}
   <div class="sec"><div class="sec-head"><h2>Ajustes</h2><button class="btn ghost sm" data-act="help">${ic('spark')} Ayuda y preguntas</button></div>
@@ -788,6 +797,7 @@ function bind(app) {
   app.querySelectorAll('[data-med]').forEach(b => b.onclick = () => openMed(b.dataset.med));
   app.querySelectorAll('[data-agendar-ctl]').forEach(b => b.onclick = () => { const k = S.controles.find(x => x.id === b.dataset.agendarCtl); openPedir({ miembroId: k.miembroId, que: 'Control de ' + k.especialidad, especialidad: k.especialidad, controlId: k.id }); });
   app.querySelectorAll('[data-pedir]').forEach(b => b.onclick = () => openPedir({ miembroId: b.dataset.pedir }));
+  app.querySelectorAll('[data-part]').forEach(b => b.onclick = () => openParticular({ miembroId: b.dataset.part }));
   app.querySelectorAll('[data-acc]').forEach(b => b.onclick = () => openAccess(b.dataset.acc));
   app.querySelectorAll('[data-inv-cancel]').forEach(b => b.onclick = () => famAction({ accion: 'cancelar', email: b.dataset.invCancel }, 'Invitación cancelada'));
   app.querySelectorAll('[data-inv-share]').forEach(b => b.onclick = () => shareInvite(b.dataset.invShare));
@@ -1473,9 +1483,9 @@ function openPlus() {
   const opt = (id, icon, t, sub, primary) => `<button class="card" id="${id}" style="grid-template-columns:auto 1fr;column-gap:14px;align-items:center${primary ? ';border-color:var(--accent)' : ''}"><span class="opt-ic">${ic(icon)}</span><span><b>${t}</b><br><span class="small muted">${sub}</span></span></button>`;
   openDialog(`${head('¿Qué necesitas hacer?')}
     ${opt('pl-pedir', 'cal', 'Pedir una cita', 'Te mostramos cómo pedirla en tu EPS y qué decir.', true)}
+    ${opt('pl-part', 'spark', 'Buscar una cita particular', 'Opciones con precio y calificaciones, y cómo verificar al médico.')}
     ${opt('pl-cita', 'check', 'Ya tengo una cita: guardarla', 'Fecha, hora, lugar y qué llevar.')}
     ${photoOn() ? opt('pl-foto', 'doc', 'Leer una foto o mensaje de la EPS', 'Toma foto a la orden o pega el SMS y llenamos la cita.') : ''}
-    ${opt('pl-part', 'spark', 'Buscar una cita particular', 'Opciones con precio y calificaciones, y cómo verificar al médico.')}
     ${opt('pl-guia', 'alert', 'Un trámite difícil con la EPS', 'Medicamentos pendientes, MIPRES, cirugía, tutela y más.')}
     ${opt('pl-aut', 'doc', 'Guardar una orden o autorización', 'Te avisamos antes de que se venza.')}
     ${opt('pl-ctl', 'pulse', 'Anotar un control', '“Control en 3 meses”: te avisamos cuándo pedirlo.')}
@@ -1517,7 +1527,7 @@ function openPedir(pre = {}) {
       <div class="fields"><label class="f">¿Para quién?<select id="pd-m">${memberOptions(mid)}</select></label><label class="f">¿Qué cita?<input id="pd-que" value="${esc(que)}" placeholder="Ej.: Medicina general"></label></div>
       ${channelsHTML(m, que, pre)}
       <div class="answer" style="margin:0"><b style="color:var(--ai)">Qué decir</b><p id="pd-script">${esc(scriptFor(m, que, pre))}</p><div class="row"><span class="small muted grow">Ten a mano el documento${pre.numero ? ' y la autorización' : ''}.</span><button class="btn sm" id="pd-copy">${ic('copy')} Copiar</button></div></div>
-      <button class="btn ghost sm" id="pd-part" style="width:fit-content">${ic('spark')} ¿Muy demorada? Buscar opción particular</button>
+      <button class="card" id="pd-part" style="grid-template-columns:auto 1fr;column-gap:12px;align-items:center;border-color:var(--accent);text-align:left"><span class="opt-ic">${ic('spark')}</span><span><b>¿La EPS demora mucho? Busca una cita particular</b><br><span class="small muted">Opciones reales con precio, calificación y teléfono.</span></span></button>
       <div class="dlg-foot"><button class="btn" id="pd-wait">Quedó pendiente</button><button class="btn primary" id="pd-got">${ic('check')} Ya me dieron la cita</button></div>`, r => {
       r.querySelector('#pd-m').onchange = e => { mid = e.target.value; draw(); };
       r.querySelector('#pd-que').oninput = e => { const t = scriptFor(member(mid), e.target.value.trim(), pre); r.querySelector('#pd-script').textContent = t; const wa = r.querySelector('#pd-wa'); if (wa) wa.href = `https://wa.me/${wa.dataset.wa}?text=${encodeURIComponent(t)}`; };
