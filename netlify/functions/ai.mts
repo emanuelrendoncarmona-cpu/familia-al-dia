@@ -2,7 +2,7 @@
 // Usa Netlify AI Gateway: no necesita clave propia; consume créditos de la cuenta de Netlify.
 import Anthropic from "@anthropic-ai/sdk";
 import type { Config } from "@netlify/functions";
-import { requireUser, getCuenta, estadoCuenta, stores, json, AI_DAILY_LIMIT } from "../../lib/common.mts";
+import { requireUser, getCuenta, estadoCuenta, stores, json, AI_DAILY_LIMIT, resolveFamily } from "../../lib/common.mts";
 
 const MODEL = "claude-haiku-5-5";
 const TIPOS = "medica, odonto, examen, imagen, terapia, vacuna, colegio, tramite, otra";
@@ -19,13 +19,16 @@ Cómo funciona la app:
 - Conectar calendario: Ajustes > Conectar mi calendario > copiar enlace. En Google Calendar (computador): Otros calendarios > + > Desde URL > pegar. En iPhone: Ajustes > Calendario > Cuentas > Añadir cuenta > Otra > Añadir calendario suscrito. Google puede tardar varias horas en mostrar cambios.
 - Plan: 14 días gratis; luego $9.900 COP al mes o $99.000 al año. Si vence, puedes ver y exportar tus datos pero no guardar cambios hasta activar el plan.
 - Privacidad: los datos se guardan cifrados en Netlify, solo tú los ves con tu cuenta. Responsable: Emnova (emanuelrendoncarmona@gmail.com).
+- Acceso familiar: en Familia > Quién tiene acceso, quien administra invita a cada integrante con su correo (puede editar o solo ver). La persona crea su cuenta con ese mismo correo y acepta la invitación. Todos ven la misma agenda.
+- Citas particulares: botón + > Buscar cita particular. Busca opciones con precio y calificaciones, y enlaces para verificar al médico en ReTHUS y a la clínica en REPS.
+- Guías: en Salud > Guías hay pasos y derechos para: cita demorada, medicamentos pendientes, MIPRES, portabilidad, cambio de EPS, incapacidades, cirugía programada, tutela y verificar médicos.
 Si no sabes algo, dilo y sugiere escribir a emanuelrendoncarmona@gmail.com.`;
 
-async function checkQuota(userId: string) {
-  const key = `${userId}/${new Date().toISOString().slice(0, 10)}`;
+async function checkQuota(userId: string, kind = "", limit = AI_DAILY_LIMIT) {
+  const key = `${userId}${kind}/${new Date().toISOString().slice(0, 10)}`;
   const s = stores.uso();
   const cur = ((await s.get(key, { type: "json" })) as { n: number } | null)?.n || 0;
-  if (cur >= AI_DAILY_LIMIT) return false;
+  if (cur >= limit) return false;
   await s.setJSON(key, { n: cur + 1 });
   return true;
 }
@@ -40,7 +43,10 @@ export default async (req: Request) => {
   if (req.method !== "POST") return json({ error: "Método no permitido" }, 405);
   const user = await requireUser();
   if (!user) return json({ error: "Inicia sesión para usar el asistente." }, 401);
-  const estado = estadoCuenta(await getCuenta(user));
+  const { fam } = await resolveFamily(user);
+  if (!fam) return json({ error: "Primero acepta o rechaza tu invitación familiar." }, 409);
+  const owner = fam.miembros.find(m => m.userId === fam.ownerId) || { userId: fam.ownerId, email: "" };
+  const estado = estadoCuenta(await getCuenta({ id: owner.userId, email: owner.email }));
   if (!estado.activo) return json({ error: "Tu prueba gratis terminó. Activa tu plan para usar el asistente.", code: "plan_vencido" }, 402);
   if (!process.env.ANTHROPIC_BASE_URL && !process.env.ANTHROPIC_API_KEY) return json({ error: "El asistente aún no está activo en el servidor." }, 503);
   if (!(await checkQuota(user.id))) return json({ error: `Llegaste al límite de ${AI_DAILY_LIMIT} consultas de hoy. Mañana se renueva.`, code: "limite" }, 429);
@@ -90,6 +96,30 @@ Devuelve SOLO JSON: {"persona": nombre exacto de la lista o null, "tipo", "espec
       const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 700, messages: [{ role: "user", content }] });
       const out = msg.content.map((b: any) => (b.type === "text" ? b.text : "")).join("");
       return json(parseJSON(out));
+    }
+
+    if (mode === "particular") {
+      if (!(await checkQuota(user.id, "-busqueda", 8))) return json({ error: "Llegaste al límite de 8 búsquedas de hoy. Mañana se renueva.", code: "limite" }, 429);
+      const esp = String(body.especialidad || "").slice(0, 120);
+      const ciudad = String(body.ciudad || "").slice(0, 80);
+      const modalidad = String(body.modalidad || "cualquiera").slice(0, 30);
+      const presupuesto = String(body.presupuesto || "").slice(0, 40);
+      const motivo = String(body.motivo || "").slice(0, 300);
+      const system = `Eres un experto en navegar el sistema de salud de Colombia y ayudas a familias a encontrar atención PARTICULAR (pagada directamente, sin EPS). Usa la búsqueda web. No das diagnósticos ni recomendaciones médicas.
+Busca opciones reales y vigentes para: ${esp} en ${ciudad || "Colombia"}; modalidad: ${modalidad}${presupuesto ? "; presupuesto aproximado: " + presupuesto : ""}${motivo ? "; contexto administrativo: " + motivo : ""}.
+Prioriza: (1) clínicas, IPS y consultorios con sitio oficial o perfil en directorios reconocidos (como Doctoralia), (2) opciones con precio de consulta publicado, (3) buenas calificaciones con número de opiniones, (4) facilidad para agendar en línea o por WhatsApp.
+REGLAS: solo incluye datos que aparezcan en los resultados de búsqueda; nunca inventes precios, teléfonos ni calificaciones (usa null si no aparecen). Los precios cambian: dilo tal como aparece y con su fuente.
+Responde SOLO con JSON: {"opciones":[{"nombre":string,"tipo":"medico"|"clinica"|"telemedicina","especialidad":string,"direccion":string|null,"ciudad":string|null,"telefono":string|null,"precio":string|null,"calificacion":string|null,"como_agendar":string|null,"url":string,"fuente":string}], "consejos":[string, string]} con máximo 6 opciones ordenadas de la mejor a la menos recomendada.`;
+      try {
+        const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 2500, system, messages: [{ role: "user", content: `Busca opciones particulares de ${esp} en ${ciudad}.` }], tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5, user_location: { type: "approximate", country: "CO", ...(ciudad ? { city: ciudad } : {}) } } as any] } as any);
+        const text = msg.content.map((b: any) => (b.type === "text" ? b.text : "")).join("");
+        const out = parseJSON(text);
+        out.opciones = (Array.isArray(out.opciones) ? out.opciones : []).filter((o: any) => o && o.nombre && /^https?:\/\//.test(String(o.url || ""))).slice(0, 6);
+        return json(out);
+      } catch (e: any) {
+        console.error("[ai particular]", e?.status, e?.message);
+        return json({ error: "La búsqueda en internet no está disponible en este momento. Usa los enlaces de búsqueda de abajo.", code: "sin_busqueda" }, 503);
+      }
     }
 
     return json({ error: "Modo desconocido." }, 400);
