@@ -258,6 +258,7 @@ footer.foot{margin-top:36px;font-size:.8125rem;color:var(--muted);display:grid;g
 (() => {
 'use strict';
 const $ = (s, el = document) => el.querySelector(s);
+const safeUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '#';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const pad = n => String(n).padStart(2, '0');
@@ -1366,7 +1367,7 @@ function openParticular(pre = {}) {
           ${o.calificacion ? `<span class="small"><b>Calificación:</b> ${esc(o.calificacion)}</span>` : ''}
           ${o.como_agendar ? `<span class="small"><b>Cómo agendar:</b> ${esc(o.como_agendar)}</span>` : ''}
           <span class="small muted">Fuente: ${esc(o.fuente || o.url)}</span>
-          <span class="chips"><a class="btn sm" href="${esc(o.url)}" target="_blank" rel="noopener">Ver</a>${o.telefono ? `<a class="btn sm" href="tel:${encodeURIComponent(o.telefono)}">Llamar ${esc(o.telefono)}</a>` : ''}<button class="btn sm" data-save="${i}">Guardar</button><button class="btn sm primary" data-book="${i}">Ya agendé</button></span></div>`).join('') : '<div class="card"><b>No encontramos opciones con datos verificables.</b><span class="small">Usa los enlaces de búsqueda de abajo.</span></div>')
+          <span class="chips"><a class="btn sm" href="${esc(safeUrl(o.url))}" target="_blank" rel="noopener">Ver</a>${o.telefono ? `<a class="btn sm" href="tel:${encodeURIComponent(o.telefono)}">Llamar ${esc(o.telefono)}</a>` : ''}<button class="btn sm" data-save="${i}">Guardar</button><button class="btn sm primary" data-book="${i}">Ya agendé</button></span></div>`).join('') : '<div class="card"><b>No encontramos opciones con datos verificables.</b><span class="small">Usa los enlaces de búsqueda de abajo.</span></div>')
           + ((res.consejos || []).length ? `<div class="answer" style="margin:0"><b style="color:var(--ai)">Consejos</b>${res.consejos.map(c => `<span class="small">• ${esc(c)}</span>`).join('')}</div>` : '')
           + '<p class="small muted" style="margin:0">Resultados tomados de internet: confirma precio, horario y que acepte particulares antes de ir.</p>';
         const toOpt = o => ({ id: uid(), miembroId: mid, nombre: o.nombre, tipo: o.tipo, especialidad: o.especialidad || q.especialidad, ciudad: o.ciudad || q.ciudad, direccion: o.direccion || '', telefono: o.telefono || '', precio: o.precio || '', calificacion: o.calificacion || '', url: o.url, fuente: o.fuente || '', guardado: todayISO() });
@@ -1381,7 +1382,7 @@ function openOpcion(id) {
   const o = (S.opciones || []).find(x => x.id === id); if (!o) return;
   openDialog(`${head(o.nombre)}
     <dl class="facts"><dt>Especialidad</dt><dd>${esc(o.especialidad || '—')}</dd>${o.direccion ? `<dt>Dirección</dt><dd>${esc(o.direccion)}</dd>` : ''}${o.telefono ? `<dt>Teléfono</dt><dd class="mono">${esc(o.telefono)}</dd>` : ''}<dt>Precio</dt><dd>${esc(o.precio || 'No publicado')}</dd>${o.calificacion ? `<dt>Calificación</dt><dd>${esc(o.calificacion)}</dd>` : ''}<dt>Fuente</dt><dd style="overflow-wrap:anywhere">${esc(o.fuente || o.url)}</dd><dt>Guardada</dt><dd>${fmtDate(o.guardado)}</dd></dl>
-    <span class="chips"><a class="btn sm" href="${esc(o.url)}" target="_blank" rel="noopener">Ver</a>${o.telefono ? `<a class="btn sm" href="tel:${encodeURIComponent(o.telefono)}">Llamar</a>` : ''}<a class="btn sm" href="${RETHUS_URL}" target="_blank" rel="noopener">Verificar médico</a><a class="btn sm" href="${REPS_URL}" target="_blank" rel="noopener">Verificar clínica</a></span>
+    <span class="chips"><a class="btn sm" href="${esc(safeUrl(o.url))}" target="_blank" rel="noopener">Ver</a>${o.telefono ? `<a class="btn sm" href="tel:${encodeURIComponent(o.telefono)}">Llamar</a>` : ''}<a class="btn sm" href="${RETHUS_URL}" target="_blank" rel="noopener">Verificar médico</a><a class="btn sm" href="${REPS_URL}" target="_blank" rel="noopener">Verificar clínica</a></span>
     <div class="dlg-foot"><button class="btn ghost danger" id="op-del">Eliminar</button><button class="btn primary" id="op-book">Ya agendé</button></div>`, r => {
     r.querySelector('#op-del').onclick = () => { dlg.close(); removeWithUndo('opciones', o.id, 'Opción eliminada'); };
     r.querySelector('#op-book').onclick = () => openCitaForm({ miembroId: o.miembroId, tipo: 'particular', especialidad: o.especialidad, lugar: [o.nombre, o.direccion].filter(Boolean).join(', '), telefono: o.telefono, costo: o.precio });
