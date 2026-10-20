@@ -55,3 +55,70 @@ export function estadoCuenta(c: Cuenta) {
 }
 
 export const isAdmin = (user: { roles?: string[] }) => Array.isArray(user.roles) && user.roles.includes("admin");
+
+// ---------- Familias compartidas ----------
+export type Rol = "admin" | "editor" | "lector";
+export type Miembro = { userId: string; email: string; rol: Rol; desde: string };
+export type Familia = { id: string; ownerId: string; nombre: string; miembros: Miembro[]; invitaciones: { email: string; rol: Rol; at: string; por: string }[] };
+export type Invite = { familyId: string; rol: Rol; por: string; familia: string; at: string };
+
+export const famStores = {
+  familias: () => getStore({ name: "familias", consistency: "strong" }),
+  usuarios: () => getStore({ name: "usuarios", consistency: "strong" }),
+  invites: () => getStore({ name: "invitaciones", consistency: "strong" }),
+};
+export const emailKey = (e: string) => encodeURIComponent(String(e || "").trim().toLowerCase());
+export const ROLES: Rol[] = ["admin", "editor", "lector"];
+
+async function ownFamily(user: { id: string; email?: string }): Promise<Familia> {
+  const fs = famStores.familias();
+  let fam = (await fs.get(user.id, { type: "json" })) as Familia | null;
+  const now = new Date().toISOString();
+  if (!fam) fam = { id: user.id, ownerId: user.id, nombre: "", miembros: [], invitaciones: [] };
+  if (!fam.miembros.some(m => m.userId === user.id)) fam.miembros.push({ userId: user.id, email: user.email || "", rol: "admin", desde: now });
+  await fs.setJSON(fam.id, fam);
+  await famStores.usuarios().setJSON(user.id, { familyId: fam.id });
+  return fam;
+}
+
+// Devuelve la familia del usuario, o una invitación pendiente si aún no pertenece a ninguna.
+export async function resolveFamily(user: { id: string; email?: string }): Promise<{ fam: Familia | null; rol: Rol | null; invite: Invite | null }> {
+  const invite = user.email ? ((await famStores.invites().get(emailKey(user.email), { type: "json" })) as Invite | null) : null;
+  const link = (await famStores.usuarios().get(user.id, { type: "json" })) as { familyId: string } | null;
+  if (link) {
+    const fam = (await famStores.familias().get(link.familyId, { type: "json" })) as Familia | null;
+    const me = fam?.miembros.find(m => m.userId === user.id);
+    if (fam && me) {
+      if (me.email !== (user.email || me.email)) { me.email = user.email!; await famStores.familias().setJSON(fam.id, fam); }
+      return { fam, rol: me.rol, invite: invite && invite.familyId !== fam.id ? invite : null };
+    }
+  }
+  // Sin familia: si tiene una invitación pendiente, se le pregunta antes de crear la suya.
+  const hadOwn = await famStores.familias().get(user.id, { type: "json" });
+  const hadData = await stores.agendas().get(user.id, { type: "json" });
+  if (invite && !hadOwn && !hadData) return { fam: null, rol: null, invite };
+  const fam = await ownFamily(user);
+  return { fam, rol: "admin", invite };
+}
+
+export async function joinFamily(user: { id: string; email?: string }, invite: Invite) {
+  const fs = famStores.familias();
+  const fam = (await fs.get(invite.familyId, { type: "json" })) as Familia | null;
+  if (!fam) return null;
+  fam.miembros = fam.miembros.filter(m => m.userId !== user.id);
+  fam.miembros.push({ userId: user.id, email: user.email || "", rol: invite.rol, desde: new Date().toISOString() });
+  fam.invitaciones = fam.invitaciones.filter(i => emailKey(i.email) !== emailKey(user.email || ""));
+  await fs.setJSON(fam.id, fam);
+  // Si tenía su propia familia, deja de ser miembro de ella (sus datos se conservan).
+  const own = (await fs.get(user.id, { type: "json" })) as Familia | null;
+  if (own && own.id !== fam.id) { own.miembros = own.miembros.filter(m => m.userId !== user.id || own.ownerId === user.id); await fs.setJSON(own.id, own); }
+  await famStores.usuarios().setJSON(user.id, { familyId: fam.id });
+  await famStores.invites().delete(emailKey(user.email || ""));
+  return fam;
+}
+
+export const familiaPublica = (fam: Familia, userId: string) => ({
+  id: fam.id, nombre: fam.nombre, esDueno: fam.ownerId === userId,
+  miembros: fam.miembros.map(m => ({ userId: m.userId, email: m.email, rol: m.rol, desde: m.desde, yo: m.userId === userId, dueno: m.userId === fam.ownerId })),
+  invitaciones: fam.invitaciones,
+});
