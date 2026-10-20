@@ -1,0 +1,1363 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Todas las citas, órdenes, controles y medicamentos de tu familia en un solo lugar.">
+<meta name="theme-color" content="#0E1A2B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Familia al Día">
+<style>:root{color-scheme:light dark;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Familia al Día</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;700&display=swap">
+<style>
+/* Emnova brand: nova orange for the main action, noche for ground and text, flujo for done/connection, brillo for one highlight.
+   Layout: a mission-control for the family's health. One "next up" instrument with a live countdown, a 14-day orbit strip, an assistant bar you talk to, and thumb-reach navigation at the bottom. */
+:root{
+  --bg:#F4F6F9; --bg2:#E9EDF2; --glass:rgba(255,255,255,.82); --solid:#FFFFFF; --sunk:#E8ECF1; --ink:#0E1A2B; --muted:#4F5D70; --line:rgba(14,26,43,.10);
+  --accent:#FF5A1F; --accent-text:#B83A0B; --accent-ink:#0E1A2B; --accent-soft:rgba(255,90,31,.12); --glow:rgba(255,90,31,.20);
+  --ai:#0B7F75; --ai-soft:rgba(15,168,154,.12);
+  --warn:#8A5A00; --warn-soft:rgba(255,194,61,.28); --crit:#B3261E; --crit-soft:#F9DEDB; --good:#0B7F75; --good-soft:rgba(15,168,154,.14);
+  --m1:#0B7F75; --m2:#D9480F; --m3:#3A5BC7; --m4:#8B4FB3; --m5:#9A7414; --m6:#0E1A2B;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono:"Figtree", "Segoe UI", system-ui, sans-serif;
+  --r:18px; --shadow:0 1px 2px rgba(14,26,43,.05), 0 10px 30px rgba(14,26,43,.07);
+  --scale:1;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1A2B; --bg2:#13223A; --glass:rgba(22,36,58,.78); --solid:#16253D; --sunk:#1C2D47; --ink:#EEF2F7; --muted:#A3B0C2; --line:rgba(200,215,235,.12);
+  --accent:#FF5A1F; --accent-text:#FF8A5C; --accent-ink:#0E1A2B; --accent-soft:rgba(255,90,31,.16); --glow:rgba(255,90,31,.30);
+  --ai:#2FD1C1; --ai-soft:rgba(15,168,154,.16);
+  --warn:#FFC23D; --warn-soft:rgba(255,194,61,.14); --crit:#FF8A80; --crit-soft:rgba(255,138,128,.15); --good:#2FD1C1; --good-soft:rgba(15,168,154,.16);
+  --m1:#2FD1C1; --m2:#FF8A5C; --m3:#8FA9FF; --m4:#D09CF5; --m5:#FFC23D; --m6:#EEF2F7;
+  --shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 12px 40px rgba(0,0,0,.4); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1A2B; --bg2:#13223A; --glass:rgba(22,36,58,.78); --solid:#16253D; --sunk:#1C2D47; --ink:#EEF2F7; --muted:#A3B0C2; --line:rgba(200,215,235,.12);
+  --accent:#FF5A1F; --accent-text:#FF8A5C; --accent-ink:#0E1A2B; --accent-soft:rgba(255,90,31,.16); --glow:rgba(255,90,31,.30);
+  --ai:#2FD1C1; --ai-soft:rgba(15,168,154,.16);
+  --warn:#FFC23D; --warn-soft:rgba(255,194,61,.14); --crit:#FF8A80; --crit-soft:rgba(255,138,128,.15); --good:#2FD1C1; --good-soft:rgba(15,168,154,.16);
+  --m1:#2FD1C1; --m2:#FF8A5C; --m3:#8FA9FF; --m4:#D09CF5; --m5:#FFC23D; --m6:#EEF2F7;
+  --shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 12px 40px rgba(0,0,0,.4); color-scheme:dark}
+*{box-sizing:border-box}
+html{font-size:calc(16px * var(--scale))}
+body{background:var(--bg);background-image:radial-gradient(1200px 500px at 85% -10%, var(--glow), transparent 60%),radial-gradient(900px 400px at -10% 0%, var(--ai-soft), transparent 60%);background-attachment:fixed;color:var(--ink);font-family:var(--body);font-size:1rem;line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0 calc(120px + env(safe-area-inset-bottom, 0px));min-height:100%}
+.wrap{max-width:820px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);font-weight:700;line-height:1.15;text-wrap:balance;margin:0;letter-spacing:-.01em}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:10px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:.875rem}
+svg.i{width:1.25em;height:1.25em;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* header */
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:18px 10px}
+.brand{display:flex;gap:12px;align-items:center;min-width:0}
+.logo{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);flex:none}
+.brand .t{display:grid;min-width:0}
+.brand .eyebrow{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand h1{font-size:1.35rem}
+.tools{display:flex;gap:6px;align-items:center}
+.iconbtn{border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);height:40px;min-width:40px;padding:0 10px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:.875rem}
+.iconbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.status{font-size:.75rem;color:var(--muted);display:flex;align-items:center;gap:6px;padding:0 4px}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px var(--good-soft)}
+.status.off i{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+
+/* assistant bar */
+.ask{position:relative;border-radius:20px;padding:2px;background:linear-gradient(var(--bg),var(--bg)) padding-box, conic-gradient(from var(--a,0deg), var(--accent), var(--ai), var(--accent)) border-box;border:2px solid transparent;margin:6px 0 4px}
+@property --a{syntax:'<angle>';inherits:false;initial-value:0deg}
+@media (prefers-reduced-motion:no-preference){.ask.busy{animation:spin 1.6s linear infinite}@keyframes spin{to{--a:360deg}}}
+.ask form{display:flex;gap:8px;align-items:center;background:var(--solid);border-radius:17px;padding:6px 6px 6px 14px}
+.ask .spark{color:var(--ai)}
+.ask input{flex:1;min-width:0;border:0;background:transparent;font-size:1.0625rem;padding:10px 0;outline:none}
+.ask button[type=submit]{border:0;background:var(--accent);color:var(--accent-ink);height:44px;width:44px;border-radius:14px;display:grid;place-items:center;flex:none}
+.suggest{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none}
+.suggest button{flex:none;border:1px solid var(--line);background:var(--glass);border-radius:999px;padding:6px 12px;font-size:.875rem;color:var(--muted)}
+.answer{background:var(--ai-soft);border-radius:16px;padding:14px 16px;display:grid;gap:8px;margin-top:6px}
+.answer .row b{color:var(--ai)}
+.answer p{margin:0;white-space:pre-wrap}
+
+/* hero: next up */
+.hero{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:24px;padding:20px;box-shadow:var(--shadow);margin-top:14px}
+.ring{position:relative;width:132px;height:132px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .track{stroke:var(--sunk);stroke-width:10;fill:none}
+.ring .val{stroke:var(--accent);stroke-width:10;fill:none;stroke-linecap:round;filter:drop-shadow(0 0 6px var(--glow))}
+@media (prefers-reduced-motion:no-preference){.ring .val{transition:stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1)}}
+.ring .c{position:absolute;inset:0;display:grid;place-content:center;text-align:center;line-height:1.1}
+.ring .c b{font-family:var(--mono);font-size:1.6rem}
+.ring .c span{font-size:.75rem;color:var(--muted)}
+.hero .info{display:grid;gap:6px;min-width:0}
+.kicker{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-text);font-weight:700}
+.hero h2{font-size:1.5rem}
+.count{font-size:1rem;color:var(--ink);font-weight:700}
+a.btn{color:inherit}
+a.btn.primary{color:var(--accent-ink)}
+.hero .meta{color:var(--muted);font-size:.95rem;overflow-wrap:anywhere}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+
+/* strip */
+.strip{display:grid;grid-template-columns:repeat(14,minmax(44px,1fr));gap:6px;overflow-x:auto;padding:4px 2px 8px;margin-top:14px;scrollbar-width:thin}
+.day{border:1px solid var(--line);background:var(--glass);border-radius:14px;padding:8px 0 10px;display:grid;justify-items:center;gap:4px;min-height:84px}
+.day .dw{font-size:.6875rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.day .dn{font-family:var(--mono);font-size:1.05rem;font-weight:600}
+.day .dots{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:36px;min-height:8px}
+.day .dots i{width:7px;height:7px;border-radius:50%}
+.day.today{border-color:var(--accent-text);box-shadow:0 0 0 3px var(--accent-soft)}
+.day[aria-pressed="true"]{background:var(--ink);color:var(--bg)} .day[aria-pressed="true"] .dw{color:var(--bg)}
+
+/* sections */
+.sec{display:grid;gap:10px;margin-top:22px}
+.sec-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.sec-head h2{font-size:1.2rem}
+.label{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-top:8px}
+.chips,.seg{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--glass);padding:7px 12px;border-radius:999px;font-size:.875rem;display:inline-flex;gap:6px;align-items:center;min-height:36px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg{background:var(--sunk);padding:4px;border-radius:14px;width:fit-content;max-width:100%}
+.seg button{border:0;background:transparent;padding:8px 14px;border-radius:10px;font-weight:700;color:var(--muted);display:flex;gap:6px;align-items:center;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--solid);color:var(--ink);box-shadow:var(--shadow)}
+.sw{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.n{font-size:.75rem;min-width:20px;padding:0 6px;border-radius:999px;background:var(--warn-soft);color:var(--warn);text-align:center;font-family:var(--mono)}
+
+/* alerts */
+.alert{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;background:var(--glass);border:1px solid var(--line)}
+.alert .ic{width:36px;height:36px;border-radius:12px;display:grid;place-items:center}
+.alert.crit .ic{background:var(--crit-soft);color:var(--crit)} .alert.warn .ic{background:var(--warn-soft);color:var(--warn)} .alert.info .ic{background:var(--accent-soft);color:var(--accent-text)}
+.alert .txt{min-width:0}
+.opt-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-text)}
+.telrow{background:var(--bg);border-radius:12px;padding:8px 12px}
+.telrow .num{flex:1 1 150px;min-width:150px}
+.telrow .num .mono{font-size:1.05rem;white-space:nowrap} .alert b{display:block;line-height:1.3}
+
+/* cards */
+.card{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:grid;gap:6px;text-align:left;width:100%}
+button.card:hover,.cita:hover{border-color:var(--accent-text)}
+.cita{display:grid;grid-template-columns:4px 70px 1fr;column-gap:14px;align-items:stretch;padding:14px 16px 14px 12px}
+.cita .bar{border-radius:4px}
+.cita .when{display:grid;align-content:start;gap:2px}
+.cita .when b{font-family:var(--mono);font-size:1.15rem}
+.cita .when span{font-size:.75rem;color:var(--muted);font-family:var(--mono)}
+.cita .main{display:grid;gap:3px;min-width:0}
+.cita .top{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.cita .who{font-size:.875rem;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cita .what{font-weight:700;font-size:1.0625rem;line-height:1.3}
+.cita .where{font-size:.875rem;color:var(--muted);overflow-wrap:anywhere}
+.cita .quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.cita.done{opacity:.7}
+.mini{height:5px;border-radius:999px;background:var(--sunk);overflow:hidden;margin-top:4px}
+.mini i{display:block;height:100%;background:var(--accent)}
+.badge{font-size:.75rem;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(--sunk);color:var(--muted)}
+.badge.good{background:var(--good-soft);color:var(--good)} .badge.warn{background:var(--warn-soft);color:var(--warn)} .badge.crit{background:var(--crit-soft);color:var(--crit)} .badge.accent{background:var(--accent-soft);color:var(--accent-text)}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap} .row>.grow{flex:1;min-width:0}
+.member{grid-template-columns:48px 1fr;column-gap:14px;align-items:start}
+.avatar{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:1.1rem;color:var(--bg)}
+dl.facts{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:4px 0 0;font-size:.875rem}
+dl.facts dt{color:var(--muted)} dl.facts dd{margin:0;overflow-wrap:anywhere}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--solid);padding:10px 16px;border-radius:14px;font-weight:700;display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:44px;text-decoration:none;font-size:.9375rem}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:.8125rem;border-radius:12px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent-text);box-shadow:0 6px 20px var(--glow)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--accent-text)}
+.btn.danger{color:var(--crit)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* bottom nav */
+nav.dock{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom, 0px) + 14px);z-index:9;display:flex;align-items:center;gap:4px;padding:6px;border-radius:22px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);box-shadow:var(--shadow);width:min(520px, calc(100vw - 24px))}
+nav.dock button{flex:1;border:0;background:transparent;border-radius:16px;display:grid;justify-items:center;gap:2px;padding:7px 4px;font-size:.6875rem;font-weight:700;color:var(--muted);position:relative;min-height:52px}
+nav.dock button[aria-current="page"]{color:var(--ink);background:var(--sunk)}
+nav.dock .plus{flex:none;width:56px;height:56px;border-radius:18px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;box-shadow:0 8px 24px var(--glow);min-height:0;padding:0}
+nav.dock .plus svg{width:26px;height:26px}
+nav.dock .dotn{position:absolute;top:6px;right:calc(50% - 18px);width:8px;height:8px;border-radius:50%;background:var(--warn)}
+
+/* empty / onboarding */
+.empty{background:var(--glass);border:1px dashed var(--line);border-radius:var(--r);padding:26px 18px;text-align:center;display:grid;gap:10px;justify-items:center}
+.onboard{background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:28px;padding:26px;display:grid;gap:16px;margin-top:16px;box-shadow:var(--shadow)}
+.onboard h2{font-size:1.75rem}
+.feat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.feat div{background:var(--sunk);border-radius:14px;padding:12px;font-size:.875rem;display:grid;gap:4px}
+.feat b{font-family:var(--display)}
+.consent{display:flex;gap:12px;align-items:flex-start;background:var(--sunk);padding:14px;border-radius:14px;font-size:.875rem}
+.consent input{width:22px;height:22px;flex:none;margin-top:2px;accent-color:var(--accent-text)}
+
+/* dialog */
+dialog{border:1px solid var(--line);border-radius:24px;padding:0;width:min(580px, calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 32px);overflow-x:hidden;background:var(--solid);color:var(--ink);box-shadow:0 30px 80px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(5,10,16,.5);backdrop-filter:blur(4px)}
+.dlg{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;padding:20px}
+.dlg>*{min-width:0}
+.dlg-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.dlg-head h3{font-size:1.3rem}
+.close{border:0;background:var(--sunk);width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fields .full{grid-column:1/-1}
+label.f{display:grid;gap:4px;font-size:.875rem;font-weight:700;min-width:0}
+label.f input,label.f select,label.f textarea{font-weight:400;font-size:1rem;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);width:100%;min-width:0;min-height:46px}
+label.f textarea{min-height:72px;resize:vertical}
+.checklist{display:grid;gap:6px}
+.checklist label{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--bg);min-height:46px}
+.checklist input{width:22px;height:22px;accent-color:var(--accent-text);flex:none}
+.checklist label.ok span{text-decoration:line-through;color:var(--muted)}
+.addreq{display:flex;gap:8px} .addreq input{flex:1;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.dlg-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;position:sticky;bottom:-20px;background:var(--solid);padding-block:10px 0;margin-bottom:-4px}
+.notice{font-size:.875rem;padding:10px 14px;border-radius:14px;background:var(--warn-soft);display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:8px}
+footer.foot{margin-top:36px;font-size:.8125rem;color:var(--muted);display:grid;gap:4px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom, 0px) + 96px);background:var(--ink);color:var(--bg);padding:10px 10px 10px 18px;border-radius:16px;font-weight:700;z-index:20;max-width:calc(100vw - 32px);display:flex;gap:12px;align-items:center}
+.toast button{border:0;background:transparent;color:inherit;text-decoration:underline;font-weight:700;padding:6px 10px}
+@media (max-width:560px){
+  .fields{grid-template-columns:1fr} .feat{grid-template-columns:1fr}
+  .hero{grid-template-columns:1fr;justify-items:start}
+  .hero .ringwrap{display:flex;gap:16px;align-items:center}
+  .ring{width:96px;height:96px} .ring .c b{font-size:1.2rem}
+  .cita{grid-template-columns:4px 58px 1fr}
+  .brand h1{font-size:1.15rem}
+  .status span{display:none}
+}
+@media (prefers-reduced-motion:no-preference){.card,.btn,.chip,.day{transition:border-color .15s,background .15s,transform .15s}.btn:active,.day:active,nav.dock button:active{transform:scale(.97)}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M12 13v4M10 15h4"/></svg></div>
+      <div class="t"><span class="eyebrow" id="famName">Agenda familiar</span><h1>Familia al Día</h1></div>
+    </div>
+    <div class="tools">
+      <span class="status" id="status"><i></i><span>Conectando…</span></span>
+      <button class="iconbtn" id="helpBtn" aria-label="Ayuda" title="Ayuda" hidden>?</button>
+      <button class="iconbtn" id="textSize" aria-pressed="false" aria-label="Letra grande" title="Letra grande">A<span style="font-size:1.25em">A</span></button>
+    </div>
+  </header>
+
+  <main id="app" aria-live="polite">
+    <div class="empty"><b>Cargando tu agenda…</b><span class="muted small">Aquí verás las citas, órdenes y controles de tu familia.</span></div>
+  </main>
+
+  <footer class="foot">
+    <span>Los avisos se ven dentro de la app. Para recibir alertas en el celular, toca “Calendario” en cada cita.</span>
+    <span>Familia al Día organiza citas. No da diagnósticos ni reemplaza a tu EPS.</span>
+    <span>Hecho por <b style="color:var(--ink)">Emnova</b> · Automatiza lo repetitivo. Brilla en lo importante.</span>
+  </footer>
+</div>
+
+<nav class="dock" id="dock" hidden aria-label="Navegación principal"></nav>
+<dialog id="dlg"><div class="dlg" id="dlgBody"></div></dialog>
+<div class="toast" id="toast" hidden role="status"><span id="toastMsg"></span><button id="toastAct" hidden>Deshacer</button></div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const pad = n => String(n).padStart(2, '0');
+const isoLocal = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayISO = () => isoLocal(new Date());
+const addDays = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); return isoLocal(new Date(y, m - 1, d + n)); };
+const toDate = (iso, h) => { const [y, m, d] = iso.split('-').map(Number); const [H, M] = (h || '00:00').split(':').map(Number); return new Date(y, m - 1, d, H, M); };
+const daysUntil = iso => { if (!iso) return null; const t = new Date(); return Math.round((toDate(iso) - new Date(t.getFullYear(), t.getMonth(), t.getDate())) / 864e5); };
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const DIA3 = ['dom','lun','mar','mié','jue','vie','sáb'];
+const fmtDate = iso => { if (!iso) return '—'; const [, m, d] = iso.split('-').map(Number); return `${d} ${MESES[m - 1]}`; };
+const fmtLong = iso => { const dt = toDate(iso); return `${DIAS[dt.getDay()]} ${dt.getDate()} de ${MESES[dt.getMonth()]}`; };
+const fmtHora = h => { if (!h) return 'Sin hora'; const [H, M] = h.split(':').map(Number); return `${((H + 11) % 12) + 1}:${pad(M)} ${H < 12 ? 'a. m.' : 'p. m.'}`; };
+const relDays = n => n === 0 ? 'hoy' : n === 1 ? 'mañana' : n === -1 ? 'ayer' : n < 0 ? `hace ${-n} días` : `en ${n} días`;
+const countdown = (iso, h) => { const ms = toDate(iso, h || '08:00') - new Date(); if (ms <= 0) return 'Es ahora'; const min = Math.round(ms / 6e4); if (min < 60) return `en ${min} min`; const hr = Math.floor(min / 60); if (hr < 24) return `en ${hr} h ${pad(min % 60)} min`; const d = Math.floor(hr / 24); return `en ${d} ${d === 1 ? 'día' : 'días'} ${hr % 24} h`; };
+
+const I = {
+  home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+  cal: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/>',
+  people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16.5 14.6c2.4.3 4.2 2 4.9 4.9"/>',
+  pulse: '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+  send: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  alert: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5v.01"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  doc: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>',
+  pill: '<rect x="3" y="9" width="18" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 8.5l5 7"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  share: '<path d="M4 12v7h16v-7M12 3v12M7.5 7.5L12 3l4.5 4.5"/>',
+  google: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18M12 13v5M9.5 15.5h5"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+};
+const ic = (k, cls = 'i') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[k]}</svg>`;
+
+const TIPOS = {
+  medica: { label: 'Cita médica', req: ['Documento de identidad', 'Orden o autorización de la EPS', 'Exámenes anteriores', 'Lista de medicamentos actuales'] },
+  odonto: { label: 'Odontología', req: ['Documento de identidad', 'Autorización de la EPS'] },
+  examen: { label: 'Examen de laboratorio', req: ['Documento de identidad', 'Orden médica', 'Ayuno (confirmar horas)', 'Muestra si la pidieron'] },
+  imagen: { label: 'Imagen diagnóstica', req: ['Documento de identidad', 'Orden y autorización', 'Estudios anteriores para comparar'] },
+  terapia: { label: 'Terapia', req: ['Documento de identidad', 'Autorización de sesiones', 'Ropa cómoda'] },
+  vacuna: { label: 'Vacunación', req: ['Carné de vacunas', 'Documento de identidad'] },
+  colegio: { label: 'Colegio', req: ['Boletín o citación', 'Preguntas para el docente'] },
+  tramite: { label: 'Trámite', req: ['Documento de identidad', 'Formularios', 'Comprobantes'] },
+  otra: { label: 'Otra', req: ['Documento de identidad'] },
+};
+// Canales oficiales verificados en el sitio de cada EPS el 20 de octubre de 2026. Cambian seguido: revisar cada mes.
+const EPS_VERIFIED = '20 oct 2026';
+const EPS = [
+  { k: 'nueva', n: 'Nueva EPS', match: /nueva\s*eps/i, web: ['Pedir cita en línea', 'https://solucionjb.nuevaeps.com.co/NEPS_Citasweb-1.0-SNAPSHOT/login.xhtml'], app: ['App Afiliados', 'https://app.nuevaeps.com.co/#/'], wa: '573214459657', waName: 'EVA', tels: { contributivo: [['Nacional', '018000954400'], ['Bogotá', '6013077022']], subsidiado: [['Nacional', '018000952000'], ['Bogotá', '6013077051']] }, more: 'https://www.nuevaeps.com.co/personas/canales-no-presenciales-ecosistema-de-servicios' },
+  { k: 'sanitas', n: 'EPS Sanitas', match: /sanitas/i, web: ['Citas médicas en línea', 'https://www.epssanitas.com/usuarios/web/nuevo-portal-eps/citas-medicas'], app: ['App EPS Sanitas (Android)', 'https://play.google.com/store/apps/details?id=colsanitas.foonkiemonkey.com.co.eps'], app2: ['App EPS Sanitas (iPhone)', 'https://itunes.apple.com/co/app/eps-sanitas/id960869433?mt=8'], wa: '573202550525', waName: 'Ana María', tels: [['Bogotá', '6013759000'], ['Medellín', '6045908383'], ['Cali', '6023989340'], ['Barranquilla', '6053226888'], ['Nacional (fijo)', '018000919100'], ['Desde celular', '#936']] },
+  { k: 'sura', n: 'EPS Sura', match: /sura/i, web: ['Pedir cita (con tu clave)', 'https://www.epssura.com/afiliados'], extra: ['Sacar la clave de afiliado', 'https://solicitudes.sura.com/SS/Register/Eps/UsersRegistration.aspx?&cdMod=EMP'], tels: [['Medellín', '6044486115'], ['Bogotá', '6014897941'], ['Resto del país', '018000519519']] },
+  { k: 'saludtotal', n: 'Salud Total EPS-S', match: /salud\s*total/i, web: ['Pide tus citas', 'https://saludtotal.com.co/pide-tus-citas-medicas/'], app: ['App Salud Total (Android)', 'https://play.google.com/store/apps/details?id=com.saludtotal.saludtotaleps&hl=es_CO'], app2: ['App Salud Total (iPhone)', 'https://apps.apple.com/co/app/salud-total-eps-s/id972508544'], wa: '573107737993', waName: 'Pablo', waCitas: true, tels: [['Nacional', '018000114524']] },
+  { k: 'famisanar', n: 'Famisanar', match: /famisanar/i, web: ['Agendamiento de citas', 'https://www.famisanar.com.co/afiliados/pbs/agendamiento-citas'], wa: '573006438831', tels: [['Bogotá', '6013078069'], ['Nacional', '018000116662']] },
+  { k: 'compensar', n: 'Compensar EPS', match: /compensar/i, app: ['App Compensar Salud (iPhone)', 'https://apps.apple.com/co/app/compensar-salud/id1128503411'], tels: [] },
+  { k: 'coosalud', n: 'Coosalud', match: /coosalud/i, web: ['Cita de medicina general', 'https://provida.citascoosalud.site/'], tels: [['Nacional', '018000515611'], ['Desde celular', '#922']] },
+  { k: 'mutualser', n: 'Mutual Ser', match: /mutual\s*ser/i, web: ['Zonaser afiliado', 'https://afiliados.mutualser.com/'], wa: '573106080399', tels: [['Nacional', '018000116882'], ['Desde celular', '#603'], ['PBX', '6056517393']] },
+  { k: 'sos', n: 'EPS S.O.S.', match: /\bs\.?o\.?s\b|servicio occidental/i, web: ['Solicitud de citas', 'https://www.sos.com.co/solicitud-citas-medicas'], wa: '573185083262', waName: 'Anita', tels: [['Nacional', '018000938777'], ['Cali', '6024898686']] },
+  { k: 'capital', n: 'Capital Salud', match: /capital\s*salud/i, web: ['Citas médicas', 'https://www.capitalsalud.gov.co/imagen-citas-medicas/'], tels: [['Línea 24 horas', '6017427257']] },
+  { k: 'savia', n: 'Savia Salud', match: /savia/i, web: ['Portal de afiliados', 'https://portal-afiliados.saviasaludeps.com'], wa: '573145932296', tels: [['Medellín', '6044601674'], ['Nacional', '018000423683']] },
+  { k: 'asmet', n: 'Asmet Salud', match: /asmet/i, web: ['Oficina virtual', 'https://oficinavirtual.asmetsalud.com/#/ov/afiliados'], wa: '573106213604', tels: [['Nacional (fijo)', '018000913876'], ['Desde celular', '6028353783']] },
+  { k: 'emssanar', n: 'Emssanar', match: /emssanar/i, web: ['Sitio web', 'https://www.emssanar.org.co'], tels: [['Nacional', '018000129393']] },
+  { k: 'aliansalud', n: 'Aliansalud', match: /aliansalud/i, web: ['Canales de atención', 'https://www.aliansalud.com.co/Paginas/Canales-de-atencion.aspx'], tels: [['Bogotá', '6017568000'], ['Nacional', '018000123703']] },
+];
+const ADRES_URL = 'https://aplicaciones.adres.gov.co/BDUA_Internet/Pages/ConsultarAfiliadoWeb_2.aspx';
+const SUPERSALUD_URL = 'https://www.supersalud.gov.co';
+const epsOf = m => m && m.eps ? EPS.find(e => e.match.test(m.eps)) || null : null;
+const fmtTel = t => t.startsWith('#') ? t : t.startsWith('01800') ? t.replace(/^(01)(8000)(\d{3})(\d{3})$/, '$1 $2 $3 $4') : t.replace(/^(\d{3})(\d{3})(\d{4})$/, '($1) $2 $3');
+const ESTADOS = { pendiente: 'Pendiente', confirmada: 'Confirmada', asistida: 'Asistida', cancelada: 'Cancelada', perdida: 'Perdida' };
+const ACTIVE = c => ['pendiente', 'confirmada'].includes(c.estado);
+const COLORS = ['--m1', '--m2', '--m3', '--m4', '--m5', '--m6'];
+
+let S = null, mode = 'memory', dbRef = null, sampleApi = null, sampleImages = false, downloadsApi = null;
+// Datos del responsable del tratamiento (Ley 1581). Completar antes de publicar.
+const RESPONSABLE = { nombre: 'Emnova', correo: 'emanuelrendoncarmona@gmail.com' };
+let view = 'inicio', filter = 'todos', dayFilter = null, salud = 'ordenes', answer = null;
+const LS_KEY = 'familia-al-dia:v1', LS_SIZE = 'familia-al-dia:size';
+// Cuentas (versión publicada en Netlify)
+let netlifyId = null, idSettings = null, authUser = null, acct = null, isAdminUser = false, pendingSync = false, recoveryPending = false, authNotice = '', lastFetch = 0;
+const IDENTITY_URL = 'https://cdn.jsdelivr.net/npm/@netlify/identity@2.0.0/+esm';
+// Planes y forma de pago. Pega aquí tus links de Wompi o Mercado Pago y tu WhatsApp de ventas (solo números, con 57).
+const PAGO = { mensual: '$9.900 COP al mes', anual: '$99.000 COP al año', linkMensual: '', linkAnual: '', whatsapp: '', correo: 'emanuelrendoncarmona@gmail.com' };
+const aiOn = () => !!sampleApi || mode === 'netlify';
+const photoOn = () => sampleImages || mode === 'netlify';
+const lsKey = () => authUser ? LS_KEY + ':' + authUser.id : LS_KEY;
+const emptyState = () => ({ v: 1, consent: null, familia: { nombre: '' }, miembros: [], citas: [], auts: [], controles: [], meds: [], sols: [], ejemplo: false });
+
+// ---------- text size (per viewer convenience) ----------
+let big = false; try { big = localStorage.getItem(LS_SIZE) === '1'; } catch (_) {}
+const applySize = () => { document.documentElement.style.setProperty('--scale', big ? '1.15' : '1'); $('#textSize').setAttribute('aria-pressed', big); };
+$('#helpBtn').onclick = () => { if (S && S.consent) go('ayuda'); };
+$('#textSize').onclick = () => { big = !big; try { localStorage.setItem(LS_SIZE, big ? '1' : '0'); } catch (_) {} applySize(); };
+applySize();
+
+// ---------- persistence ----------
+let saveTimer = null, saving = Promise.resolve();
+function persist() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const snap = JSON.parse(JSON.stringify(S));
+    saving = saving.then(async () => {
+      if (mode === 'cloud' && dbRef) {
+        try { await dbRef.set(snap); }
+        catch (e) {
+          if (e && e.code === 'unavailable') { try { await new Promise(r => setTimeout(r, 600 + Math.random() * 600)); await dbRef.set(snap); return; } catch (_) {} }
+          if (e && e.code === 'quota_exceeded') { toast('No hay espacio para guardar más datos.'); return; }
+          mode = 'local'; setStatus(); writeLocal(snap); toast('Guardado solo en este navegador');
+        }
+      } else if (mode === 'netlify') {
+        writeLocal(snap);
+        if (acct && !acct.activo) { pendingSync = false; setStatus(); return; }
+        try {
+          const r = await fetch('/api/data', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(snap), credentials: 'same-origin' });
+          if (r.status === 402) { if (acct) acct.activo = false; render(); openPlan(); return; }
+          if (r.status === 401) { toast('Tu sesión se cerró. Entra de nuevo para guardar.'); pendingSync = true; setStatus(); return; }
+          if (!r.ok) throw new Error(String(r.status));
+          const j = await r.json(); S.guardado = j.guardado; pendingSync = false; lastFetch = Date.now();
+        } catch (_) { pendingSync = true; }
+        setStatus();
+      } else if (mode === 'local') writeLocal(snap);
+    });
+  }, 350);
+}
+window.addEventListener('online', () => { if (mode === 'netlify' && pendingSync) persist(); });
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || mode !== 'netlify' || pendingSync || Date.now() - lastFetch < 60000 || dlg.open) return;
+  try { const r = await fetch('/api/data', { credentials: 'same-origin' }); if (!r.ok) return; const j = await r.json(); lastFetch = Date.now(); acct = j.cuenta; if (j.agenda && j.agenda.guardado && j.agenda.guardado !== S.guardado) { S = Object.assign(emptyState(), j.agenda); render(); } } catch (_) {}
+});
+function writeLocal(snap) { try { localStorage.setItem(lsKey(), JSON.stringify(snap)); } catch (_) { if (mode === 'local') { mode = 'memory'; setStatus(); } } }
+function readLocal(key) { try { const r = localStorage.getItem(key || lsKey()); return r ? JSON.parse(r) : null; } catch (_) { return undefined; } }
+function setStatus() {
+  const s = $('#status'); const ok = mode === 'cloud' || (mode === 'netlify' && !pendingSync && (!acct || acct.activo));
+  s.classList.toggle('off', !ok);
+  s.querySelector('span').textContent = mode === 'cloud' ? 'Guardado en tu cuenta' : mode === 'netlify' ? (acct && !acct.activo ? 'Plan vencido: sin guardar' : pendingSync ? 'Sin conexión: se guarda al volver' : 'Guardado en tu cuenta') : mode === 'auth' ? 'Sin sesión' : mode === 'local' ? 'Guardado en este navegador' : 'Vista previa sin guardar';
+  $('#helpBtn').hidden = mode === 'auth';
+}
+
+async function boot() {
+  let loaded = null;
+  if (!window.claude && location.protocol.startsWith('http')) {
+    try {
+      netlifyId = await import(IDENTITY_URL);
+      idSettings = await netlifyId.getSettings();
+    } catch (_) { netlifyId = null; }
+    if (netlifyId) {
+      try { const cb = await netlifyId.handleAuthCallback(); if (cb && cb.type === 'recovery') recoveryPending = true; if (cb && cb.type === 'confirmation') authNotice = '¡Correo confirmado! Ya puedes usar tu cuenta.'; }
+      catch (_) { authNotice = 'Ese enlace ya no es válido o venció. Pide uno nuevo.'; }
+      authUser = await netlifyId.getUser();
+      if (!authUser) { mode = 'auth'; S = emptyState(); setStatus(); renderAuth(); return; }
+      await loadCloud(); startTicker(); return;
+    }
+  }
+  try {
+    const use = window.claude && window.claude.use ? window.claude.use.bind(window.claude) : null;
+    if (use) {
+      const [db, user, sample, dl] = await Promise.all([use('db'), use('user'), use('sample'), use('downloads')]);
+      downloadsApi = dl;
+      if (sample) { sampleApi = sample; try { const lim = await sample.limits(); sampleImages = !!(lim && lim.images); } catch (_) {} }
+      const id = user ? await user.id() : null;
+      if (db && id) { dbRef = db.doc('data/users/' + id + '/agenda'); const snap = await dbRef.get(); mode = 'cloud'; if (snap.exists) loaded = snap.data(); }
+    }
+  } catch (_) { dbRef = null; mode = 'memory'; }
+  if (mode !== 'cloud') { const l = readLocal(); if (l === undefined) mode = 'memory'; else { mode = 'local'; loaded = l; } }
+  S = loaded ? Object.assign(emptyState(), JSON.parse(JSON.stringify(loaded))) : emptyState();
+  if (!Array.isArray(S.sols)) S.sols = [];
+  setStatus(); render(); startTicker();
+}
+function startTicker() { setInterval(() => { const el = $('#cd'); if (el && el.dataset.f) el.textContent = countdown(el.dataset.f, el.dataset.h); }, 30000); }
+
+// ---------- cuenta en la nube (Netlify) ----------
+async function loadCloud() {
+  mode = 'netlify';
+  let j = null;
+  try {
+    const r = await fetch('/api/data', { credentials: 'same-origin' });
+    if (r.status === 401) { try { await netlifyId.logout(); } catch (_) {} authUser = null; mode = 'auth'; S = emptyState(); setStatus(); renderAuth(); return; }
+    if (!r.ok) throw new Error(String(r.status));
+    j = await r.json(); lastFetch = Date.now();
+  } catch (_) {
+    const cached = readLocal();
+    S = Object.assign(emptyState(), cached || {}); pendingSync = !!cached; setStatus(); render();
+    toast('Sin conexión. Mostrando lo último guardado en este celular.'); return;
+  }
+  acct = j.cuenta; isAdminUser = !!j.admin;
+  const cached = readLocal();
+  const base = j.agenda || (cached && cached.guardado && !j.agenda ? cached : null);
+  S = Object.assign(emptyState(), base || {});
+  if (!Array.isArray(S.sols)) S.sols = [];
+  setStatus(); render();
+  if (!j.agenda) {
+    const legacy = readLocal(LS_KEY);
+    if (legacy && Array.isArray(legacy.miembros) && legacy.miembros.length && !legacy.ejemplo) {
+      openConfirm('¿Traer los datos de este celular?', `Encontramos ${legacy.miembros.length} personas y ${legacy.citas.length} citas guardadas aquí antes de crear tu cuenta. Puedes pasarlas a tu cuenta para verlas en cualquier dispositivo.`, 'Pasarlos a mi cuenta', () => { S = Object.assign(emptyState(), legacy); persist(); render(); toast('Datos pasados a tu cuenta'); });
+    }
+  }
+  if (recoveryPending) openNewPassword();
+  else if (acct && !acct.activo) openPlan();
+}
+
+function renderAuth(tabSel = 'entrar', notice = authNotice) {
+  $('#dock').hidden = true; $('#famName').textContent = 'Agenda familiar';
+  const google = idSettings && idSettings.providers && idSettings.providers.google;
+  const signupOff = idSettings && idSettings.disableSignup;
+  $('#app').innerHTML = `<div class="onboard" style="max-width:520px;margin-inline:auto">
+    <span class="kicker">Tu centro de control familiar</span>
+    <h2>${tabSel === 'crear' ? 'Crea tu cuenta' : tabSel === 'olvido' ? 'Recupera tu contraseña' : 'Entra a tu cuenta'}</h2>
+    ${notice ? `<div class="notice">${esc(notice)}</div>` : ''}
+    ${tabSel !== 'olvido' ? `<div class="seg" role="group" aria-label="Elige"><button aria-pressed="${tabSel === 'entrar'}" data-auth="entrar">Entrar</button>${signupOff ? '' : `<button aria-pressed="${tabSel === 'crear'}" data-auth="crear">Crear cuenta</button>`}</div>` : ''}
+    ${google && tabSel !== 'olvido' ? `<button class="btn" id="au-google" style="width:100%"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 12h8M16.5 8.5A6 6 0 1 0 18 13"/></svg> ${tabSel === 'crear' ? 'Crear cuenta' : 'Entrar'} con Google</button><div class="small muted" style="text-align:center">o con tu correo</div>` : ''}
+    <form id="au-form" class="fields" style="grid-template-columns:1fr" autocomplete="on">
+      ${tabSel === 'crear' ? '<label class="f">Tu nombre<input id="au-name" autocomplete="name" required></label>' : ''}
+      <label class="f">Correo<input id="au-email" type="email" autocomplete="email" inputmode="email" required></label>
+      ${tabSel !== 'olvido' ? `<label class="f">Contraseña<input id="au-pass" type="password" autocomplete="${tabSel === 'crear' ? 'new-password' : 'current-password'}" minlength="8" required></label>` : ''}
+      ${tabSel === 'crear' ? '<label class="consent"><input type="checkbox" id="au-terms" required><span>Acepto los <a href="/terminos.html" target="_blank" rel="noopener">términos</a> y la <a href="/privacidad.html" target="_blank" rel="noopener">política de datos</a>.</span></label>' : ''}
+      <div class="notice" id="au-err" hidden></div>
+      <button class="btn primary" type="submit" id="au-go">${tabSel === 'crear' ? 'Crear cuenta gratis' : tabSel === 'olvido' ? 'Enviarme el enlace' : 'Entrar'}</button>
+    </form>
+    <div class="row">${tabSel === 'entrar' ? '<button class="btn ghost sm" data-auth="olvido">Olvidé mi contraseña</button>' : '<button class="btn ghost sm" data-auth="entrar">Volver a entrar</button>'}<button class="btn ghost sm" id="au-demo">Ver demo sin cuenta</button></div>
+    ${tabSel === 'crear' ? '<p class="small muted" style="margin:0">Tienes 14 días gratis. Después, ' + esc(PAGO.mensual) + ' o ' + esc(PAGO.anual) + '. No pedimos tarjeta para probar.</p>' : ''}
+  </div>`;
+  const app = $('#app');
+  app.querySelectorAll('[data-auth]').forEach(b => b.onclick = () => renderAuth(b.dataset.auth, ''));
+  $('#au-google')?.addEventListener('click', () => { try { netlifyId.oauthLogin('google'); } catch (_) { showErr('No se pudo abrir Google. Intenta con tu correo.'); } });
+  $('#au-demo').onclick = () => { mode = 'memory'; S = demoData(); S.consent = { at: new Date().toISOString(), version: 'demo' }; setStatus(); view = 'inicio'; render(); toast('Demo: nada se guarda'); };
+  const showErr = m => { const e = $('#au-err'); e.hidden = false; e.textContent = m; };
+  const msgFor = e => { const t = String((e && (e.message || e.msg || e.error_description)) || '').toLowerCase(); if (t.includes('confirm')) return 'Confirma tu correo: te enviamos un enlace. Revisa también la carpeta de spam.'; if (t.includes('invalid') || t.includes('password') || t.includes('credentials') || t.includes('grant')) return 'Correo o contraseña incorrectos.'; if (t.includes('already') || t.includes('registered') || t.includes('exists')) return 'Ese correo ya tiene cuenta. Entra o recupera tu contraseña.'; if (t.includes('signup')) return 'Por ahora no se pueden crear cuentas nuevas.'; return 'No se pudo completar. Revisa tu conexión e intenta de nuevo.'; };
+  $('#au-form').onsubmit = async e => {
+    e.preventDefault(); const go = $('#au-go'); go.disabled = true; $('#au-err').hidden = true;
+    const email = $('#au-email').value.trim(), pass = $('#au-pass')?.value || '';
+    try {
+      if (tabSel === 'olvido') { await netlifyId.requestPasswordRecovery(email); renderAuth('entrar', 'Si ese correo tiene cuenta, te llegó un enlace para crear una contraseña nueva. Revisa también spam.'); return; }
+      if (tabSel === 'crear') {
+        if (!$('#au-terms').checked) { showErr('Acepta los términos para continuar.'); go.disabled = false; return; }
+        await netlifyId.signup(email, pass, { full_name: $('#au-name').value.trim() });
+        if (idSettings && idSettings.autoconfirm) { await netlifyId.login(email, pass); }
+        else { renderAuth('entrar', `Te enviamos un correo a ${email}. Abre el enlace para confirmar tu cuenta y luego entra aquí. Revisa también spam.`); return; }
+      } else await netlifyId.login(email, pass);
+      authUser = await netlifyId.getUser(); authNotice = '';
+      if (!authUser) throw new Error('sin sesión');
+      await loadCloud();
+    } catch (err) { showErr(msgFor(err)); go.disabled = false; }
+  };
+}
+
+function openNewPassword() {
+  recoveryPending = false;
+  openDialog(`${head('Crea tu nueva contraseña')}<form id="np-f" style="display:grid;gap:12px"><label class="f">Contraseña nueva<input type="password" id="np-p" minlength="8" autocomplete="new-password" required></label><div class="dlg-foot"><button class="btn primary" type="submit">Guardar contraseña</button></div></form>`, r => {
+    r.querySelector('#np-f').onsubmit = async e => { e.preventDefault(); try { await netlifyId.updateUser({ password: val(r, 'np-p') }); dlg.close(); toast('Contraseña actualizada'); } catch (_) { toast('No se pudo cambiar. Pide otro enlace.'); } };
+  });
+}
+
+async function aiCall(body) {
+  const r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(Object.assign({ hoy: `${todayISO()} (${DIAS[new Date().getDay()]})` }, body)) });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 402) { if (acct) acct.activo = false; openPlan(); throw { code: 'plan' }; }
+  if (!r.ok) throw { code: r.status === 429 ? 'rate_limited' : 'ai', message: j.error };
+  return j;
+}
+
+// Reduce la foto antes de enviarla (más rápido y barato).
+function shrinkImage(file, max = 1600) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res({ media_type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1] }); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('img')); };
+    img.src = url;
+  });
+}
+
+// ---------- derived ----------
+const member = id => S.miembros.find(m => m.id === id);
+const mColor = m => m ? `var(${m.color || '--m1'})` : 'var(--muted)';
+const first = m => (m?.nombre || '—').split(' ')[0];
+const initials = n => (n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const sortCitas = (a, b) => (a.fecha + (a.hora || '')).localeCompare(b.fecha + (b.hora || ''));
+const citaTitle = c => c.especialidad || TIPOS[c.tipo]?.label || 'Cita';
+const upcoming = () => S.citas.filter(c => ACTIVE(c) && toDate(c.fecha, c.hora || '23:59') >= new Date(Date.now() - 2 * 3600e3)).sort(sortCitas);
+
+function autStatus(a) {
+  if (a.estado === 'usada') return { cls: 'good', txt: 'Usada' };
+  const n = daysUntil(a.vence);
+  if (n === null) return { cls: '', txt: 'Sin fecha' };
+  if (n < 0) return { cls: 'crit', txt: 'Vencida' };
+  if (n <= 15) return { cls: 'warn', txt: `Vence ${relDays(n)}` };
+  return { cls: 'good', txt: `Vigente · ${n} días` };
+}
+
+function alerts() {
+  const out = [];
+  upcoming().forEach(c => {
+    const n = daysUntil(c.fecha); const m = member(c.miembroId); const falta = (c.req || []).filter(r => !r.ok).length;
+    if (n <= 1) out.push({ lvl: n === 0 ? 'crit' : 'warn', k: 'clock', title: `${n === 0 ? 'Hoy' : 'Mañana'} ${fmtHora(c.hora)} · ${citaTitle(c)} de ${first(m)}`, sub: falta ? `Faltan ${falta} cosas por alistar` : 'Todo listo para ir', act: ['Ver', () => openCita(c.id)] });
+    else if (n === 2 && falta) out.push({ lvl: 'warn', k: 'clock', title: `En 2 días · ${citaTitle(c)} de ${first(m)}`, sub: `Faltan ${falta} cosas por alistar`, act: ['Alistar', () => openCita(c.id)] });
+  });
+  S.auts.filter(a => a.estado !== 'usada').forEach(a => {
+    const n = daysUntil(a.vence); const m = member(a.miembroId);
+    if (n !== null && n < 0) out.push({ lvl: 'crit', k: 'doc', title: `Autorización vencida · ${a.servicio} (${first(m)})`, sub: `Venció el ${fmtDate(a.vence)}. Pide una nueva a la EPS.`, act: ['Ver', () => go('salud', 'ordenes')] });
+    else if (n !== null && n <= 15) out.push({ lvl: n <= 5 ? 'crit' : 'warn', k: 'doc', title: `Autorización por vencer · ${a.servicio} (${first(m)})`, sub: `Vence ${relDays(n)}. Pide la cita antes del ${fmtDate(a.vence)}.`, act: ['Pedir cita', () => openPedir({ miembroId: a.miembroId, que: a.servicio, autId: a.id, numero: a.numero })] });
+  });
+  S.controles.filter(k => k.estado === 'pendiente').forEach(k => {
+    const n = daysUntil(k.fecha); const m = member(k.miembroId);
+    if (n !== null && n <= 21) out.push({ lvl: n < 0 ? 'crit' : 'info', k: 'pulse', title: `Control de ${k.especialidad} · ${first(m)}`, sub: n < 0 ? `Debía ser ${relDays(n)}. Pide la cita cuanto antes.` : `Para el ${fmtDate(k.fecha)}. Ya puedes pedir la cita.`, act: ['Pedir cita', () => openPedir({ miembroId: k.miembroId, que: 'Control de ' + k.especialidad, especialidad: k.especialidad, controlId: k.id })] });
+  });
+  S.meds.forEach(md => {
+    const n = daysUntil(md.proxima); const m = member(md.miembroId);
+    if (n !== null && n <= 5) out.push({ lvl: n < 0 ? 'crit' : 'warn', k: 'pill', title: `${md.nombre} · ${first(m)}`, sub: n < 0 ? `La entrega era ${relDays(n)}.` : `Reclamar o renovar fórmula ${relDays(n)}.`, act: ['Ver', () => go('salud', 'meds')] });
+  });
+  (S.sols || []).filter(x => x.estado === 'esperando').forEach(x => {
+    const n = -daysUntil(x.fecha); const m = member(x.miembroId);
+    if (n >= 5) out.push({ lvl: n >= 10 ? 'crit' : 'warn', k: 'alert', title: `Llevas ${n} días esperando · ${x.que} (${first(m)})`, sub: 'Insiste por otro canal o pon una queja. Te decimos cómo.', act: ['Qué hago', () => openReclamo(x.id)] });
+  });
+  const rank = { crit: 0, warn: 1, info: 2 };
+  return out.sort((a, b) => rank[a.lvl] - rank[b.lvl]);
+}
+
+// ---------- share helpers ----------
+function waText(c) { const m = member(c.miembroId); return `Recordatorio: ${citaTitle(c)} de ${m?.nombre || ''}\n${fmtLong(c.fecha)}, ${fmtHora(c.hora)}\n${c.lugar || 'Lugar por confirmar'}${c.acompana ? `\nAcompaña: ${c.acompana}` : ''}${(c.req || []).length ? `\nLlevar: ${c.req.map(r => r.t).join(', ')}` : ''}`; }
+function gcalUrl(c) {
+  const m = member(c.miembroId); const s = toDate(c.fecha, c.hora || '08:00'); const e = new Date(s.getTime() + 3600e3);
+  const f = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+  const p = new URLSearchParams({ action: 'TEMPLATE', text: `${citaTitle(c)} · ${m?.nombre || ''}`, dates: `${f(s)}/${f(e)}`, ctz: 'America/Bogota', location: c.lugar || '', details: (c.req || []).length ? 'Llevar: ' + c.req.map(r => r.t).join(', ') : '' });
+  return 'https://calendar.google.com/calendar/render?' + p.toString();
+}
+const waUrl = c => 'https://wa.me/?text=' + encodeURIComponent(waText(c));
+
+// ---------- navigation ----------
+function go(v, sub) { view = v; if (sub) salud = sub; dayFilter = null; render(); window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' }); }
+function renderDock() {
+  const d = $('#dock'); if (!S.consent) { d.hidden = true; return; } d.hidden = false;
+  const saludN = S.auts.filter(a => a.estado !== 'usada' && (daysUntil(a.vence) ?? 99) <= 15).length + S.controles.filter(k => k.estado === 'pendiente' && (daysUntil(k.fecha) ?? 99) <= 21).length + S.meds.filter(m => (daysUntil(m.proxima) ?? 99) <= 5).length;
+  const b = (k, label, i, dot) => `<button data-go="${k}" ${view === k ? 'aria-current="page"' : ''}>${ic(i)}<span>${label}</span>${dot ? '<span class="dotn" aria-label="Hay avisos"></span>' : ''}</button>`;
+  d.innerHTML = b('inicio', 'Inicio', 'home') + b('agenda', 'Agenda', 'cal') + `<button class="plus" id="dockPlus" aria-label="Nueva cita">${ic('plus')}</button>` + b('salud', 'Salud', 'pulse', saludN > 0) + b('familia', 'Familia', 'people');
+  d.querySelectorAll('[data-go]').forEach(x => x.onclick = () => go(x.dataset.go));
+  $('#dockPlus').onclick = () => openPlus();
+}
+
+// ---------- render ----------
+function render() {
+  const app = $('#app');
+  renderDock();
+  if (!S.consent) { app.innerHTML = onboardHTML(); bindOnboard(); return; }
+  $('#famName').textContent = S.familia.nombre ? 'Familia ' + S.familia.nombre : 'Agenda familiar';
+  const demo = S.ejemplo ? `<div class="notice"><span>Estás viendo una familia de ejemplo.</span><button class="btn sm" data-act="clear-demo">Empezar con la mía</button></div>` : '';
+  const pay = mode === 'netlify' && acct && !acct.activo ? `<div class="notice" style="background:var(--crit-soft)"><span><b>Tu prueba gratis terminó.</b> Puedes ver y exportar tus datos, pero los cambios no se guardan hasta activar tu plan.</span><button class="btn sm primary" data-act="plan">Activar plan</button></div>`
+    : mode === 'netlify' && acct && acct.plan === 'prueba' && acct.dias <= 3 ? `<div class="notice"><span>Te quedan ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'} de prueba gratis.</span><button class="btn sm" data-act="plan">Ver planes</button></div>` : '';
+  const body = view === 'inicio' ? inicioHTML() : view === 'agenda' ? agendaHTML() : view === 'salud' ? saludHTML() : view === 'ayuda' ? ayudaHTML() : familiaHTML();
+  app.innerHTML = demo + pay + body;
+  bind(app);
+}
+
+function askHTML() {
+  const sugg = ['¿Qué tenemos esta semana?', `Cita de ${S.miembros[S.miembros.length - 1] ? first(S.miembros[S.miembros.length - 1]) : 'mi mamá'} el jueves a las 3 pm con cardiología`, '¿Qué autorizaciones se vencen pronto?', 'Control de pediatría en 3 meses'];
+  return `<div class="ask" id="askWrap"><form id="askForm" autocomplete="off"><span class="spark">${ic('spark')}</span><label class="sr" for="askIn">Escribe lo que necesitas</label><input id="askIn" placeholder="Escribe o dicta: “cita de mi papá mañana 7 am…”" enterkeyhint="send"><button type="submit" aria-label="Enviar">${ic('send')}</button></form></div>
+  <div class="suggest">${sugg.map(s => `<button data-sugg="${esc(s)}">${esc(s)}</button>`).join('')}</div>
+  ${answer ? `<div class="answer"><div class="row"><b>${ic('spark')} Asistente</b><button class="btn ghost sm" data-act="close-answer">Cerrar</button></div><p>${esc(answer)}</p></div>` : ''}`;
+}
+
+function inicioHTML() {
+  if (!S.miembros.length) return askHTML() + `<div class="empty" style="margin-top:14px"><b>Primero agrega a tu familia</b><span class="muted small">Cada cita, orden y medicamento pertenece a una persona.</span><button class="btn primary" data-act="add-member">Agregar persona</button></div>`;
+  const up = upcoming(); const next = up[0]; const al = alerts();
+  let hero;
+  if (next) {
+    const m = member(next.miembroId); const req = next.req || []; const ok = req.filter(r => r.ok).length; const pct = req.length ? ok / req.length : 1;
+    const C = 2 * Math.PI * 52;
+    hero = `<div class="hero"><div class="ringwrap"><div class="ring" role="img" aria-label="${ok} de ${req.length} cosas listas"><svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="val" cx="60" cy="60" r="52" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}"/></svg><div class="c"><b>${req.length ? `${ok}/${req.length}` : '✓'}</b><span>${req.length ? 'listo' : 'sin lista'}</span></div></div></div>
+      <div class="info"><span class="kicker">Lo próximo · <span class="mono" id="cd" data-f="${next.fecha}" data-h="${next.hora || ''}">${countdown(next.fecha, next.hora)}</span></span>
+      <h2>${esc(citaTitle(next))}</h2>
+      <span class="count"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '')} · ${esc(fmtLong(next.fecha))}, ${esc(fmtHora(next.hora))}</span>
+      <span class="meta">${esc(next.lugar || 'Lugar por confirmar')}${next.acompana ? ' · acompaña ' + esc(next.acompana) : ''}</span>
+      <div class="actions"><button class="btn primary" data-cita="${next.id}">${ic('check')} Alistar</button><a class="btn" href="${esc(gcalUrl(next))}" target="_blank" rel="noopener">${ic('google')} A mi calendario</a><a class="btn" href="${esc(waUrl(next))}" target="_blank" rel="noopener">${ic('share')} WhatsApp</a></div></div></div>`;
+  } else hero = `<div class="empty" style="margin-top:14px"><b>No hay citas próximas</b><span class="muted small">Escribe arriba algo como “cita de odontología el lunes a las 9”, o pide una a tu EPS.</span><button class="btn primary" data-act="pedir">${ic('cal')} Pedir una cita</button></div>`;
+  return askHTML() + hero + stripHTML() +
+    `<div class="sec"><div class="sec-head"><h2>Atención</h2>${al.length ? `<span class="badge ${al.some(a => a.lvl === 'crit') ? 'crit' : 'warn'}">${al.length} ${al.length === 1 ? 'aviso' : 'avisos'}</span>` : ''}</div>
+    ${al.length ? al.slice(0, 6).map((a, i) => `<div class="alert ${a.lvl}"><span class="ic">${ic(a.k)}</span><div class="txt"><b>${esc(a.title)}</b><span class="small muted">${esc(a.sub)}</span></div><button class="btn sm" data-alert="${i}">${esc(a.act[0])}</button></div>`).join('') : `<div class="card"><b>Todo en orden</b><span class="small muted">No hay autorizaciones por vencer ni controles atrasados.</span></div>`}</div>
+    ${up.length > 1 ? `<div class="sec"><div class="sec-head"><h2>Después</h2><button class="btn ghost sm" data-go2="agenda">Ver agenda completa</button></div>${up.slice(1, 4).map(citaCard).join('')}</div>` : ''}`;
+}
+
+function stripHTML() {
+  const t = todayISO();
+  return `<div class="strip" role="group" aria-label="Próximos 14 días">${Array.from({ length: 14 }, (_, i) => {
+    const d = addDays(t, i); const dt = toDate(d); const cs = S.citas.filter(c => c.fecha === d && c.estado !== 'cancelada');
+    return `<button class="day ${i === 0 ? 'today' : ''}" data-day="${d}" aria-pressed="${dayFilter === d}" aria-label="${fmtLong(d)}: ${cs.length} citas"><span class="dw">${i === 0 ? 'hoy' : DIA3[dt.getDay()]}</span><span class="dn">${dt.getDate()}</span><span class="dots">${cs.slice(0, 6).map(c => `<i style="background:${mColor(member(c.miembroId))}"></i>`).join('')}</span></button>`;
+  }).join('')}</div>`;
+}
+
+function memberChips() {
+  return `<div class="chips" role="group" aria-label="Filtrar por persona"><button class="chip" aria-pressed="${filter === 'todos'}" data-filter="todos">Todos</button>${S.miembros.map(m => `<button class="chip" aria-pressed="${filter === m.id}" data-filter="${m.id}"><span class="sw" style="background:${mColor(m)}"></span>${esc(first(m))}</button>`).join('')}</div>`;
+}
+
+function agendaHTML() {
+  if (!S.miembros.length) return `<div class="empty"><b>Primero agrega a tu familia</b><button class="btn primary" data-act="add-member">Agregar persona</button></div>`;
+  let list = S.citas.filter(c => filter === 'todos' || c.miembroId === filter).sort(sortCitas);
+  if (dayFilter) list = list.filter(c => c.fecha === dayFilter);
+  const up = list.filter(c => ACTIVE(c) && daysUntil(c.fecha) >= 0);
+  const past = list.filter(c => !up.includes(c)).reverse();
+  const groups = [['Hoy', c => daysUntil(c.fecha) === 0], ['Mañana', c => daysUntil(c.fecha) === 1], ['Próximos 7 días', c => { const n = daysUntil(c.fecha); return n >= 2 && n <= 7; }], ['Más adelante', c => daysUntil(c.fecha) > 7]];
+  let h = `<div class="sec" style="margin-top:8px"><div class="sec-head"><h2>Agenda${dayFilter ? ' · ' + esc(fmtLong(dayFilter)) : ''}</h2>${dayFilter ? '<button class="btn ghost sm" data-act="clear-day">Ver todos los días</button>' : `<button class="btn sm" data-act="week">${ic('share')} Enviar la semana a la familia</button>`}</div>${memberChips()}</div>` + stripHTML();
+  if (!up.length) h += `<div class="empty" style="margin-top:10px"><b>${dayFilter ? 'Ese día no hay citas' : 'No hay citas próximas'}</b><button class="btn primary" data-act="plus">${ic('plus')} Agregar</button></div>`;
+  groups.forEach(([g, fn]) => { const it = up.filter(fn); if (it.length) h += `<div class="sec" style="margin-top:12px"><div class="label">${g}</div>${it.map(citaCard).join('')}</div>`; });
+  if (past.length && !dayFilter) h += `<div class="sec" style="margin-top:12px"><div class="label">Historial</div>${past.slice(0, 10).map(citaCard).join('')}</div>`;
+  return h;
+}
+
+function citaCard(c) {
+  const m = member(c.miembroId); const req = c.req || []; const ok = req.filter(r => r.ok).length; const act = ACTIVE(c);
+  const st = c.estado === 'asistida' ? 'good' : c.estado === 'confirmada' ? 'accent' : ['cancelada', 'perdida'].includes(c.estado) ? 'crit' : '';
+  const n = daysUntil(c.fecha);
+  return `<div class="card cita ${act ? '' : 'done'}"><span class="bar" style="background:${mColor(m)}"></span>
+    <button class="when" data-cita="${c.id}" style="border:0;background:none;padding:0;text-align:left"><b>${c.hora ? esc(fmtHora(c.hora).split(' ')[0]) : '—'}</b><span>${c.hora ? (Number(c.hora.split(':')[0]) < 12 ? 'a. m.' : 'p. m.') : ''}</span><span>${fmtDate(c.fecha)}</span></button>
+    <div class="main"><div class="top"><span class="who">${esc(m?.nombre || 'Sin asignar')}${c.acompana ? ' · acompaña ' + esc(c.acompana) : ''}</span><span class="badge ${st}">${act && n >= 0 && n <= 1 ? relDays(n) : ESTADOS[c.estado]}</span></div>
+      <button class="what" data-cita="${c.id}" style="border:0;background:none;padding:0;text-align:left">${esc(citaTitle(c))}</button>
+      <span class="where">${esc(TIPOS[c.tipo]?.label || '')}${c.lugar ? ' · ' + esc(c.lugar) : ''}</span>
+      ${act && req.length ? `<span class="small muted">Para llevar: ${ok} de ${req.length} listos</span><span class="mini" aria-hidden="true"><i style="width:${Math.round(ok / req.length * 100)}%"></i></span>` : ''}
+      ${act ? `<div class="quick"><button class="btn sm" data-cita="${c.id}">${ic('check')} Lista</button>${n <= 0 ? `<button class="btn sm" data-done="${c.id}">Asistí</button>` : `<a class="btn sm" href="${esc(gcalUrl(c))}" target="_blank" rel="noopener">${ic('google')} Calendario</a>`}<a class="btn sm" href="${esc(waUrl(c))}" target="_blank" rel="noopener">${ic('share')} WhatsApp</a></div>` : ''}
+    </div></div>`;
+}
+
+function saludHTML() {
+  const nT = (S.sols || []).filter(x => x.estado === 'esperando').length, nA = S.auts.filter(a => a.estado !== 'usada' && (daysUntil(a.vence) ?? 99) <= 15).length, nC = S.controles.filter(k => k.estado === 'pendiente').length, nM = S.meds.filter(m => (daysUntil(m.proxima) ?? 99) <= 5).length;
+  const seg = `<div class="seg" role="group" aria-label="Sección">${[['tramites', 'Trámites', nT], ['ordenes', 'Órdenes', nA], ['controles', 'Controles', nC], ['meds', 'Medicamentos', nM]].map(([k, l, c]) => `<button aria-pressed="${salud === k}" data-salud="${k}">${l}${c ? `<span class="n">${c}</span>` : ''}</button>`).join('')}</div>`;
+  let h = `<div class="sec" style="margin-top:8px"><div class="sec-head"><h2>Salud</h2></div>${seg}</div><div class="sec" style="margin-top:14px">`;
+  if (salud === 'tramites') {
+    const list = [...(S.sols || [])].sort((a, b) => (a.estado !== 'esperando') - (b.estado !== 'esperando') || a.fecha.localeCompare(b.fecha));
+    h += `<div class="row"><span class="small muted grow">Citas o autorizaciones que pediste y aún no te dan. Te avisamos si pasan muchos días.</span><button class="btn primary sm" data-act="pedir">${ic('plus')} Pedir cita</button></div>` + (list.length ? list.map(x => { const m = member(x.miembroId); const n = -daysUntil(x.fecha); const cls = x.estado !== 'esperando' ? 'good' : n >= 10 ? 'crit' : n >= 5 ? 'warn' : ''; return `<button class="card" data-sol="${x.id}"><span class="row"><b class="grow">${esc(x.que)}</b><span class="badge ${cls}">${x.estado === 'esperando' ? (n === 0 ? 'Pedida hoy' : `Esperando · ${n} ${n === 1 ? 'día' : 'días'}`) : 'Resuelta'}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')} · pedida por ${esc(x.canal || '—')} el ${fmtDate(x.fecha)}${x.radicado ? ` · radicado <span class="mono">${esc(x.radicado)}</span>` : ''}</span></button>`; }).join('') : `<div class="empty"><b>No tienes trámites pendientes</b><span class="muted small">Cuando pidas una cita y te digan “le devolvemos la llamada”, anótalo aquí.</span></div>`);
+  } else if (salud === 'ordenes') {
+    const list = [...S.auts].sort((a, b) => (a.estado === 'usada') - (b.estado === 'usada') || (a.vence || '9').localeCompare(b.vence || '9'));
+    h += `<div class="row"><span class="small muted grow">Te avisamos cuando a una autorización le falten 15 días o menos.</span><button class="btn primary sm" data-act="add-aut">${ic('plus')} Agregar</button></div>` + (list.length ? list.map(a => { const m = member(a.miembroId); const s = autStatus(a); const n = daysUntil(a.vence); const span = a.exp && a.vence ? Math.max(1, daysUntil(a.vence) - daysUntil(a.exp)) : null; const used = span && n !== null ? Math.min(1, Math.max(0, 1 - n / span)) : 0; return `<button class="card" data-aut="${a.id}"><span class="row"><b class="grow">${esc(a.servicio)}</b><span class="badge ${s.cls}">${esc(s.txt)}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')}${a.numero ? ` · N.° <span class="mono">${esc(a.numero)}</span>` : ''} · vence ${fmtDate(a.vence)}</span>${a.estado !== 'usada' && span ? `<span class="mini" aria-hidden="true"><i style="width:${Math.round(used * 100)}%;background:var(--${s.cls === 'good' ? 'accent' : s.cls || 'accent'})"></i></span>` : ''}</button>`; }).join('') : `<div class="empty"><b>Sin órdenes registradas</b><span class="muted small">Guarda aquí cada autorización con su fecha de vencimiento.</span></div>`);
+  } else if (salud === 'controles') {
+    const list = [...S.controles].sort((a, b) => (a.estado !== 'pendiente') - (b.estado !== 'pendiente') || (a.fecha || '').localeCompare(b.fecha || ''));
+    h += `<div class="row"><span class="small muted grow">Cuando el médico diga “control en 3 meses”, anótalo aquí.</span><button class="btn primary sm" data-act="add-ctl">${ic('plus')} Agregar</button></div>` + (list.length ? list.map(k => { const m = member(k.miembroId); const n = daysUntil(k.fecha); const cls = k.estado !== 'pendiente' ? 'good' : n < 0 ? 'crit' : n <= 21 ? 'warn' : ''; return `<div class="card"><span class="row"><b class="grow">${esc(k.especialidad)}</b><span class="badge ${cls}">${k.estado !== 'pendiente' ? 'Agendado' : 'Para el ' + fmtDate(k.fecha)}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')}${k.origen ? ' · ' + esc(k.origen) : ''}</span>${k.estado === 'pendiente' ? `<div class="row"><span></span><span class="chips"><button class="btn ghost sm danger" data-del-ctl="${k.id}">Quitar</button><button class="btn sm" data-agendar-ctl="${k.id}">Pedir cita</button></span></div>` : ''}</div>`; }).join('') : `<div class="empty"><b>No hay controles pendientes</b></div>`);
+  } else {
+    const list = [...S.meds].sort((a, b) => (a.proxima || '9').localeCompare(b.proxima || '9'));
+    h += `<div class="row"><span class="small muted grow">Medicamentos de uso continuo y su próxima entrega.</span><button class="btn primary sm" data-act="add-med">${ic('plus')} Agregar</button></div>` + (list.length ? list.map(md => { const m = member(md.miembroId); const n = daysUntil(md.proxima); const cls = n === null ? '' : n < 0 ? 'crit' : n <= 5 ? 'warn' : 'good'; return `<button class="card" data-med="${md.id}"><span class="row"><b class="grow">${esc(md.nombre)}</b><span class="badge ${cls}">${n === null ? 'Sin fecha' : 'Entrega ' + relDays(n)}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')} · ${esc(md.dosis || '')}${md.frecuencia ? ' · ' + esc(md.frecuencia) : ''}</span></button>`; }).join('') : `<div class="empty"><b>Sin medicamentos</b></div>`);
+  }
+  return h + '</div>';
+}
+
+function familiaHTML() {
+  return `<div class="sec" style="margin-top:8px"><div class="sec-head"><h2>Familia</h2><button class="btn primary sm" data-act="add-member">${ic('plus')} Agregar persona</button></div>
+  ${S.miembros.length ? S.miembros.map(m => {
+    const prox = S.citas.filter(c => c.miembroId === m.id && ACTIVE(c) && daysUntil(c.fecha) >= 0).sort(sortCitas)[0];
+    const pend = S.auts.filter(a => a.miembroId === m.id && a.estado !== 'usada').length; const e = epsOf(m);
+    return `<div class="card member"><span class="avatar" style="background:${mColor(m)}">${esc(initials(m.nombre))}</span>
+      <span class="main"><span class="row"><b class="grow">${esc(m.nombre)}</b><span class="badge">${esc(m.parentesco || '')}</span></span>
+      <dl class="facts"><dt>EPS</dt><dd>${esc(m.eps || '—')}${m.regimen ? ' · ' + esc(m.regimen) : ''}</dd><dt>Documento</dt><dd class="mono">${esc(m.doc || '—')}</dd>${m.alergias ? `<dt>Alergias</dt><dd><span class="badge crit">${esc(m.alergias)}</span></dd>` : ''}<dt>Próxima</dt><dd>${prox ? `${esc(citaTitle(prox))}, ${fmtDate(prox.fecha)}` : 'Sin citas'}</dd><dt>Órdenes</dt><dd>${pend} ${pend === 1 ? 'vigente' : 'vigentes'}</dd></dl>
+      <div class="actions"><button class="btn sm primary" data-pedir="${m.id}">${ic('cal')} Pedir cita${e ? ' a ' + esc(e.n) : ''}</button><button class="btn sm" data-member="${m.id}">Editar</button></div></span></div>`;
+  }).join('') : `<div class="empty"><b>Aún no hay nadie</b><span class="muted small">Agrega a las personas cuyas citas organizas.</span></div>`}</div>
+  <div class="sec"><div class="sec-head"><h2>Ajustes</h2><button class="btn ghost sm" data-act="help">${ic('spark')} Ayuda y preguntas</button></div>
+    ${mode === 'netlify' && acct ? `<div class="card"><div class="row"><span class="grow"><b>Tu cuenta</b><br><span class="small muted">${esc(acct.email || '')}</span><br><span class="badge ${acct.plan === 'pago' ? 'good' : acct.plan === 'prueba' ? 'accent' : 'crit'}">${acct.plan === 'pago' ? 'Plan activo hasta el ' + fmtDate(String(acct.hasta).slice(0, 10)) : acct.plan === 'prueba' ? `Prueba gratis · ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}` : 'Plan vencido'}</span></span><span class="chips"><button class="btn sm ${acct.plan === 'pago' ? '' : 'primary'}" data-act="plan">${acct.plan === 'pago' ? 'Mi plan' : 'Activar plan'}</button><button class="btn sm" data-act="logout">Cerrar sesión</button></span></div></div>
+    <div class="card"><div class="row"><span class="grow"><b>Conectar mi calendario</b><br><span class="small muted">Tus citas aparecen solas en Google Calendar o en el iPhone.</span></span><button class="btn sm" data-act="calendar">Conectar</button></div></div>` : ''}
+    <div class="card"><div class="row"><span class="grow"><b>Exportar a Google Sheets o Excel</b><br><span class="small muted">Descarga todas las citas en una tabla.</span></span><button class="btn sm" data-act="csv">Exportar citas</button></div></div>
+    ${isAdminUser ? '<div class="card" style="border-color:var(--accent)"><div class="row"><span class="grow"><b>Administración</b><br><span class="small muted">Clientes, pruebas y activación de planes.</span></span><button class="btn sm primary" data-act="admin">Abrir panel</button></div></div>' : ''}
+    <div class="card"><div class="row"><span class="grow"><b>Tenerla como app en tu celular</b><br><span class="small muted">Ábrela con un toque desde la pantalla de inicio.</span></span><button class="btn sm" data-act="install">Cómo hacerlo</button></div></div>
+    <div class="card"><div class="row"><span class="grow"><b>Copia de seguridad</b><br><span class="small muted">Guarda un archivo con todos tus datos o recupéralos en otro celular.</span></span><span class="chips"><button class="btn sm" data-act="backup">Descargar copia</button><button class="btn sm" data-act="restore">Recuperar</button></span></div><input type="file" id="restoreIn" accept=".json,application/json" hidden></div>
+    <div class="card"><div class="row"><span class="grow"><b>Privacidad</b><br><span class="small muted">Cómo se guardan y usan tus datos.</span></span><span class="chips"><button class="btn sm" data-act="privacy">Ver política</button><button class="btn sm danger" data-act="wipe">Borrar mis datos</button></span></div></div>
+  </div>`;
+}
+
+function bind(app) {
+  const al = alerts();
+  app.querySelectorAll('[data-alert]').forEach(b => b.onclick = () => al[+b.dataset.alert].act[1]());
+  app.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => { filter = b.dataset.filter; render(); });
+  app.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { const d = b.dataset.day; view = 'agenda'; dayFilter = dayFilter === d ? null : d; render(); });
+  app.querySelectorAll('[data-go2]').forEach(b => b.onclick = () => go(b.dataset.go2));
+  app.querySelectorAll('[data-salud]').forEach(b => b.onclick = () => { salud = b.dataset.salud; render(); });
+  app.querySelectorAll('[data-cita]').forEach(b => b.onclick = () => openCita(b.dataset.cita));
+  app.querySelectorAll('[data-done]').forEach(b => b.onclick = () => { const c = S.citas.find(x => x.id === b.dataset.done); c.estado = 'asistida'; persist(); render(); afterVisit(c); });
+  app.querySelectorAll('[data-member]').forEach(b => b.onclick = () => openMember(b.dataset.member));
+  app.querySelectorAll('[data-aut]').forEach(b => b.onclick = () => openAut(b.dataset.aut));
+  app.querySelectorAll('[data-med]').forEach(b => b.onclick = () => openMed(b.dataset.med));
+  app.querySelectorAll('[data-agendar-ctl]').forEach(b => b.onclick = () => { const k = S.controles.find(x => x.id === b.dataset.agendarCtl); openPedir({ miembroId: k.miembroId, que: 'Control de ' + k.especialidad, especialidad: k.especialidad, controlId: k.id }); });
+  app.querySelectorAll('[data-pedir]').forEach(b => b.onclick = () => openPedir({ miembroId: b.dataset.pedir }));
+  app.querySelectorAll('[data-sol]').forEach(b => b.onclick = () => openSol(b.dataset.sol));
+  $('#restoreIn')?.addEventListener('change', e => importData(e.target.files[0]));
+  app.querySelectorAll('[data-del-ctl]').forEach(b => b.onclick = () => removeWithUndo('controles', b.dataset.delCtl, 'Control quitado'));
+  app.querySelectorAll('[data-sugg]').forEach(b => b.onclick = () => { $('#askIn').value = b.dataset.sugg; $('#askIn').focus(); });
+  $('#askForm')?.addEventListener('submit', e => { e.preventDefault(); ask($('#askIn').value.trim()); });
+  $('#helpForm')?.addEventListener('submit', e => { e.preventDefault(); askHelp($('#helpIn').value.trim()); });
+  app.querySelectorAll('[data-faq-go]').forEach(b => b.onclick = () => ({ familia: () => go('familia'), plus: () => openPlus(), calendar: () => (mode === 'netlify' ? openCalendar() : go('familia')), install: () => openInstall(), plan: () => openPlan() })[b.dataset.faqGo]?.());
+  app.querySelectorAll('[data-act]').forEach(b => b.onclick = () => ({
+    'add-member': () => openMember(), 'new-cita': () => openCitaForm(), 'plus': () => openPlus(), 'week': () => shareWeek(), 'help': () => go('ayuda'), 'plan': () => openPlan(), 'calendar': () => openCalendar(), 'csv': () => exportCSV(), 'admin': () => openAdmin(), 'logout': () => doLogout(), 'install': () => openInstall(), 'backup': () => exportData(), 'restore': () => $('#restoreIn').click(), 'privacy': () => openPrivacy(), 'wipe': () => openConfirm('¿Borrar todos tus datos?', 'Se eliminan todas las personas, citas, órdenes, controles, medicamentos y trámites. No se puede deshacer.', 'Borrar todo', async () => { if (mode === 'netlify') { try { await fetch('/api/data', { method: 'DELETE', credentials: 'same-origin' }); } catch (_) {} try { localStorage.removeItem(lsKey()); } catch (_) {} S = emptyState(); view = 'inicio'; render(); toast('Datos borrados de tu cuenta'); return; } S = emptyState(); persist(); view = 'inicio'; render(); toast('Datos borrados'); }), 'add-aut': () => openAut(), 'add-ctl': () => openCtl(), 'add-med': () => openMed(),
+    'clear-day': () => { dayFilter = null; render(); }, 'pedir': () => openPedir({}), 'close-answer': () => { answer = null; render(); },
+    'clear-demo': () => openConfirm('¿Borrar la familia de ejemplo?', 'Se eliminan los datos de ejemplo para que empieces con los tuyos.', 'Borrar ejemplo', () => { const c = S.consent; S = emptyState(); S.consent = c; persist(); view = 'familia'; render(); openMember(); }),
+  })[b.dataset.act]?.());
+}
+
+// ---------- assistant ----------
+async function ask(q) {
+  if (!q) return;
+  const wrap = $('#askWrap');
+  if (!aiOn()) { quickParse(q); return; }
+  wrap.classList.add('busy'); $('#askIn').disabled = true;
+  const t = todayISO();
+  const ctx = {
+    hoy: `${t} (${DIAS[toDate(t).getDay()]})`,
+    personas: S.miembros.map(m => ({ nombre: m.nombre, parentesco: m.parentesco })),
+    citas: S.citas.filter(c => daysUntil(c.fecha) >= -30).map(c => ({ persona: member(c.miembroId)?.nombre, que: citaTitle(c), tipo: c.tipo, fecha: c.fecha, hora: c.hora, lugar: c.lugar, estado: c.estado, faltan: (c.req || []).filter(r => !r.ok).map(r => r.t) })),
+    autorizaciones: S.auts.map(a => ({ persona: member(a.miembroId)?.nombre, servicio: a.servicio, vence: a.vence, estado: a.estado })),
+    controles: S.controles.map(k => ({ persona: member(k.miembroId)?.nombre, especialidad: k.especialidad, fecha: k.fecha, estado: k.estado })),
+    medicamentos: S.meds.map(m => ({ persona: member(m.miembroId)?.nombre, nombre: m.nombre, proxima_entrega: m.proxima })),
+  };
+  const prompt = `Eres el asistente de una agenda familiar de citas en Colombia. Responde en español claro y cálido, sin dar consejos médicos.
+Datos de la familia (JSON): ${JSON.stringify(ctx)}
+Tipos de cita válidos: ${Object.keys(TIPOS).join(', ')}.
+El usuario escribió: """${q}"""
+Decide UNA acción y devuelve SOLO un objeto JSON:
+- Si quiere registrar una cita: {"accion":"cita","persona":<nombre exacto de la lista o null>,"tipo":<tipo válido>,"especialidad":string,"fecha":"YYYY-MM-DD","hora":"HH:MM" o null,"lugar":string o null,"requisitos":[strings]}
+- Si quiere anotar un control futuro: {"accion":"control","persona":...,"especialidad":string,"fecha":"YYYY-MM-DD"}
+- Si quiere guardar una autorización u orden: {"accion":"autorizacion","persona":...,"servicio":string,"numero":string o null,"vence":"YYYY-MM-DD" o null}
+- Si quiere guardar un medicamento: {"accion":"medicamento","persona":...,"nombre":string,"dosis":string o null,"frecuencia":string o null,"proxima":"YYYY-MM-DD" o null}
+- Si hace una pregunta: {"accion":"respuesta","texto":"respuesta breve (máximo 5 líneas) basada SOLO en los datos"}
+Interpreta fechas relativas desde hoy (por ejemplo "el jueves" = el próximo jueves; "en 3 meses" = hoy + 3 meses). "Mi mamá", "mi papá", etc. se emparejan por parentesco. No inventes datos que el usuario no dijo.`;
+  try {
+    const r = sampleApi ? await sampleApi.json(prompt, { modelTier: 'default' }) : await aiCall({ mode: 'agenda', q, ctx });
+    handleAI(r, q);
+  } catch (e) {
+    if (e && e.code === 'not_granted') toast('Sin permiso para el asistente. Abriendo el formulario.');
+    else if (e && e.code === 'rate_limited') toast('Muchas consultas seguidas. Espera un momento.');
+    quickParse(q);
+  } finally { wrap?.classList.remove('busy'); const i = $('#askIn'); if (i) { i.disabled = false; } }
+}
+const findPerson = name => { if (!name) return null; const n = String(name).toLowerCase(); return S.miembros.find(m => m.nombre.toLowerCase() === n) || S.miembros.find(m => m.nombre.toLowerCase().startsWith(n.split(' ')[0])) || S.miembros.find(m => (m.parentesco || '').toLowerCase() === n) || null; };
+const okDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '') ? s : '';
+function handleAI(r, q) {
+  if (!r || typeof r !== 'object') { quickParse(q); return; }
+  const p = findPerson(r.persona);
+  if (r.accion === 'respuesta') { answer = String(r.texto || 'No encontré una respuesta en tus datos.'); render(); return; }
+  $('#askIn') && ($('#askIn').value = '');
+  if (r.accion === 'cita') openCitaForm({ miembroId: p?.id, tipo: TIPOS[r.tipo] ? r.tipo : 'medica', especialidad: r.especialidad || '', fecha: okDate(r.fecha) || addDays(todayISO(), 1), hora: /^\d{2}:\d{2}$/.test(r.hora || '') ? r.hora : '', lugar: r.lugar || '', extraReq: Array.isArray(r.requisitos) ? r.requisitos : null, fromAI: true });
+  else if (r.accion === 'control') openCtl({ miembroId: p?.id, especialidad: r.especialidad, fecha: okDate(r.fecha) });
+  else if (r.accion === 'autorizacion') openAut(null, { miembroId: p?.id, servicio: r.servicio, numero: r.numero || '', vence: okDate(r.vence), exp: todayISO() });
+  else if (r.accion === 'medicamento') openMed(null, { miembroId: p?.id, nombre: r.nombre, dosis: r.dosis || '', frecuencia: r.frecuencia || '', proxima: okDate(r.proxima) });
+  else quickParse(q);
+}
+// Offline fallback: understand the basics without AI
+function quickParse(q) {
+  const s = q.toLowerCase();
+  if (/\?|qué|que tenemos|cuál|cuáles/.test(s) && !/cita de|control de/.test(s)) {
+    const up = upcoming().filter(c => daysUntil(c.fecha) <= 7);
+    answer = up.length ? 'Esta semana:\n' + up.map(c => `• ${fmtLong(c.fecha)}, ${fmtHora(c.hora)}: ${citaTitle(c)} de ${first(member(c.miembroId))}`).join('\n') : 'No hay citas en los próximos 7 días.';
+    render(); return;
+  }
+  const p = S.miembros.find(m => s.includes(first(m).toLowerCase()) || (m.parentesco && s.includes(m.parentesco.toLowerCase())));
+  let fecha = addDays(todayISO(), 1);
+  if (s.includes('hoy')) fecha = todayISO(); else if (s.includes('pasado mañana')) fecha = addDays(todayISO(), 2);
+  else { const di = DIAS.findIndex(d => s.includes(d)); if (di >= 0) { const cur = new Date().getDay(); fecha = addDays(todayISO(), ((di - cur + 7) % 7) || 7); } }
+  let hora = ''; const hm = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|a\. ?m\.|pm|p\. ?m\.)?/);
+  if (hm && (hm[3] || hm[2])) { let H = +hm[1]; if (hm[3] && hm[3].startsWith('p') && H < 12) H += 12; hora = `${pad(H)}:${hm[2] || '00'}`; }
+  if (/control/.test(s)) { const mm = s.match(/(\d+)\s*mes/); openCtl({ miembroId: p?.id, especialidad: '', fecha: mm ? addDays(todayISO(), +mm[1] * 30) : addDays(todayISO(), 90) }); return; }
+  openCitaForm({ miembroId: p?.id, fecha, hora, notas: q });
+}
+
+// ---------- onboarding ----------
+function onboardHTML() {
+  return `<div class="onboard">
+    <span class="kicker">Tu centro de control familiar</span>
+    <h2>Todas las citas de tu familia, en un solo lugar</h2>
+    <div class="feat"><div><b>Avisa a tiempo</b><span class="muted">Citas, autorizaciones por vencer y controles pendientes.</span></div><div><b>Dile qué pasó</b><span class="muted">Escribe “cita de mi mamá el jueves a las 3” y se agenda.</span></div><div><b>Pide la cita fácil</b><span class="muted">Los canales oficiales de tu EPS y qué decir, en un toque.</span></div></div>
+    <label class="f">Apellido de tu familia<input id="ob-fam" placeholder="Ej.: Rodríguez Gómez" autocomplete="off"></label>
+    <label class="consent"><input type="checkbox" id="ob-consent"><span>Autorizo de manera expresa el tratamiento de los datos de salud que registre, míos y de las personas a mi cargo (con su autorización), solo para organizar citas y recordatorios, según la Ley 1581 de 2012. Puedo borrarlos cuando quiera.</span></label>
+    <div class="row"><button class="btn" id="ob-demo">Ver con una familia de ejemplo</button><button class="btn primary" id="ob-start" disabled>Empezar con mi familia</button></div>
+  </div>`;
+}
+function bindOnboard() {
+  const cb = $('#ob-consent'), st = $('#ob-start');
+  cb.onchange = () => st.disabled = !cb.checked;
+  st.onclick = () => { S.consent = { at: new Date().toISOString(), version: 'v1' }; S.familia.nombre = $('#ob-fam').value.trim(); persist(); view = 'familia'; render(); openMember(); };
+  $('#ob-demo').onclick = () => { S = demoData(); S.consent = { at: new Date().toISOString(), version: 'v1-ejemplo' }; persist(); view = 'inicio'; render(); toast('Familia de ejemplo cargada'); };
+}
+
+function demoData() {
+  const t = todayISO(); const d = n => addDays(t, n);
+  const ana = uid(), luis = uid(), sofi = uid(), carmen = uid();
+  const s = emptyState(); s.ejemplo = true; s.familia.nombre = 'Ramírez (ejemplo)';
+  s.miembros = [
+    { id: ana, nombre: 'Ana Ramírez', parentesco: 'Yo', color: '--m1', eps: 'EPS Sanitas', regimen: 'contributivo', doc: 'CC 0000000', nac: '1986-04-12', alergias: '', notas: '' },
+    { id: luis, nombre: 'Luis Pérez', parentesco: 'Pareja', color: '--m3', eps: 'EPS Sanitas', regimen: 'contributivo', doc: 'CC 0000001', nac: '1984-09-02', alergias: '', notas: '' },
+    { id: sofi, nombre: 'Sofía Pérez', parentesco: 'Hija', color: '--m4', eps: 'EPS Sanitas', regimen: 'contributivo', doc: 'TI 0000002', nac: '2014-02-20', alergias: 'Penicilina', notas: '' },
+    { id: carmen, nombre: 'Carmen Ruiz', parentesco: 'Mamá', color: '--m2', eps: 'Nueva EPS', regimen: 'subsidiado', doc: 'CC 0000003', nac: '1952-11-30', alergias: '', notas: 'Usa audífono.' },
+  ];
+  const req = (tipo, okN = 0) => TIPOS[tipo].req.map((x, i) => ({ t: x, ok: i < okN }));
+  s.citas = [
+    { id: uid(), miembroId: carmen, tipo: 'medica', especialidad: 'Medicina interna', fecha: d(1), hora: '07:40', lugar: 'Clínica de ejemplo, consultorio 204', profesional: '', estado: 'confirmada', acompana: 'Ana', notas: 'Llevar glucometrías del mes', req: req('medica', 2) },
+    { id: uid(), miembroId: sofi, tipo: 'odonto', especialidad: 'Control de ortodoncia', fecha: d(2), hora: '15:00', lugar: 'Consultorio odontológico de ejemplo', profesional: '', estado: 'pendiente', acompana: 'Luis', notas: '', req: req('odonto') },
+    { id: uid(), miembroId: carmen, tipo: 'examen', especialidad: 'Hemoglobina glicosilada', fecha: d(4), hora: '06:30', lugar: 'Laboratorio de ejemplo, sede norte', profesional: '', estado: 'pendiente', acompana: 'Luis', notas: '', req: req('examen', 1) },
+    { id: uid(), miembroId: sofi, tipo: 'colegio', especialidad: 'Entrega de boletines', fecha: d(9), hora: '07:00', lugar: 'Colegio de ejemplo', profesional: '', estado: 'pendiente', acompana: '', notas: '', req: req('colegio') },
+    { id: uid(), miembroId: ana, tipo: 'imagen', especialidad: 'Ecografía de tiroides', fecha: d(13), hora: '10:20', lugar: 'Centro de imágenes de ejemplo', profesional: '', estado: 'pendiente', acompana: '', notas: '', req: req('imagen') },
+    { id: uid(), miembroId: luis, tipo: 'medica', especialidad: 'Medicina general', fecha: d(-6), hora: '14:00', lugar: 'IPS de ejemplo', profesional: '', estado: 'asistida', acompana: '', notas: '', req: [] },
+  ];
+  s.auts = [
+    { id: uid(), miembroId: carmen, servicio: 'Oftalmología', numero: 'EJ-48213', exp: d(-80), vence: d(10), estado: 'vigente' },
+    { id: uid(), miembroId: ana, servicio: 'Ecografía de tiroides', numero: 'EJ-51007', exp: d(-12), vence: d(78), estado: 'vigente' },
+    { id: uid(), miembroId: luis, servicio: 'Perfil lipídico', numero: 'EJ-50211', exp: d(-6), vence: d(24), estado: 'vigente' },
+  ];
+  s.controles = [
+    { id: uid(), miembroId: carmen, especialidad: 'Cardiología', fecha: d(18), estado: 'pendiente', origen: 'Indicado en la última cita' },
+    { id: uid(), miembroId: sofi, especialidad: 'Pediatría (crecimiento y desarrollo)', fecha: d(45), estado: 'pendiente', origen: '' },
+  ];
+  s.meds = [
+    { id: uid(), miembroId: carmen, nombre: 'Losartán 50 mg', dosis: '1 tableta', frecuencia: 'cada 12 horas', proxima: d(3) },
+    { id: uid(), miembroId: carmen, nombre: 'Metformina 850 mg', dosis: '1 tableta', frecuencia: 'con almuerzo y cena', proxima: d(17) },
+  ];
+  s.sols = [{ id: uid(), miembroId: carmen, que: 'Oftalmología', canal: 'teléfono', fecha: d(-6), estado: 'esperando', radicado: '', autId: s.auts[0].id }];
+  return s;
+}
+
+// ---------- dialogs ----------
+const dlg = $('#dlg'), dbody = $('#dlgBody');
+function openDialog(html, bindFn) { dbody.innerHTML = html; if (!dlg.open) dlg.showModal(); dlg.scrollTop = 0; dbody.querySelector('.close')?.addEventListener('click', () => dlg.close()); bindFn && bindFn(dbody); }
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+const head = t => `<div class="dlg-head"><h3>${esc(t)}</h3><button class="close" aria-label="Cerrar">${ic('x')}</button></div>`;
+const memberOptions = sel => S.miembros.map(m => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.nombre)}</option>`).join('');
+const val = (r, id) => r.querySelector('#' + id)?.value.trim() || '';
+function openConfirm(title, text, okLabel, onOk) {
+  openDialog(`${head(title)}<p style="margin:0">${esc(text)}</p><div class="dlg-foot"><button class="btn" id="cf-no">Cancelar</button><button class="btn primary" id="cf-ok">${esc(okLabel)}</button></div>`, r => { r.querySelector('#cf-no').onclick = () => dlg.close(); r.querySelector('#cf-ok').onclick = () => { dlg.close(); onOk(); }; });
+}
+function removeWithUndo(coll, id, msg) {
+  const idx = S[coll].findIndex(x => x.id === id); if (idx < 0) return; const item = S[coll][idx];
+  S[coll].splice(idx, 1); persist(); render();
+  toast(msg, () => { S[coll].splice(idx, 0, item); persist(); render(); toast('Recuperado'); });
+}
+
+function openCita(id) {
+  const c = S.citas.find(x => x.id === id); if (!c) return; const m = member(c.miembroId);
+  const draw = () => openDialog(`${head(citaTitle(c))}
+    <div class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')} · ${esc(TIPOS[c.tipo]?.label || '')}</div>
+    <dl class="facts"><dt>Cuándo</dt><dd>${esc(fmtLong(c.fecha))}, ${esc(fmtHora(c.hora))} (${relDays(daysUntil(c.fecha))})</dd><dt>Dónde</dt><dd>${esc(c.lugar || 'Por confirmar')}</dd>${c.profesional ? `<dt>Profesional</dt><dd>${esc(c.profesional)}</dd>` : ''}<dt>Acompaña</dt><dd>${esc(c.acompana || 'Nadie asignado')}</dd>${c.notas ? `<dt>Notas</dt><dd>${esc(c.notas)}</dd>` : ''}${m?.alergias ? `<dt>Alergias</dt><dd><span class="badge crit">${esc(m.alergias)}</span></dd>` : ''}</dl>
+    <div class="actions"><a class="btn sm" href="${esc(gcalUrl(c))}" target="_blank" rel="noopener">${ic('google')} A mi calendario</a><a class="btn sm" href="${esc(waUrl(c))}" target="_blank" rel="noopener">${ic('share')} Enviar por WhatsApp</a><button class="btn sm" id="cd-copy">${ic('copy')} Copiar</button></div>
+    <div><b>Qué llevar</b><div class="checklist" style="margin-top:6px">${(c.req || []).map((r, i) => `<label class="${r.ok ? 'ok' : ''}"><input type="checkbox" data-req="${i}" ${r.ok ? 'checked' : ''}><span>${esc(r.t)}</span></label>`).join('') || '<span class="muted small">Sin requisitos.</span>'}</div>
+    <form class="addreq" id="addreqF" style="margin-top:8px"><input id="newreq" placeholder="Agregar algo para llevar" aria-label="Agregar requisito"><button class="btn sm" type="submit">Agregar</button></form></div>
+    <label class="f">Estado<select id="cd-estado">${Object.entries(ESTADOS).map(([k, l]) => `<option value="${k}" ${k === c.estado ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <div class="dlg-foot"><button class="btn ghost danger" id="cd-del">Eliminar</button><button class="btn" id="cd-edit">Editar</button>${c.estado !== 'asistida' ? `<button class="btn primary" id="cd-done">${ic('check')} Asistí</button>` : ''}</div>`, r => {
+    r.querySelectorAll('[data-req]').forEach(cb => cb.onchange = () => { c.req[+cb.dataset.req].ok = cb.checked; cb.closest('label').classList.toggle('ok', cb.checked); persist(); render(); });
+    r.querySelector('#addreqF').onsubmit = e => { e.preventDefault(); const v = val(r, 'newreq'); if (!v) return; (c.req = c.req || []).push({ t: v, ok: false }); persist(); render(); draw(); setTimeout(() => $('#newreq')?.focus(), 0); };
+    r.querySelector('#cd-copy').onclick = async () => { try { await navigator.clipboard.writeText(waText(c)); toast('Copiado'); } catch (_) { toast('No se pudo copiar'); } };
+    r.querySelector('#cd-estado').onchange = e => { c.estado = e.target.value; persist(); render(); if (c.estado === 'asistida') afterVisit(c); };
+    r.querySelector('#cd-edit').onclick = () => openCitaForm(c);
+    r.querySelector('#cd-del').onclick = () => { dlg.close(); removeWithUndo('citas', c.id, 'Cita eliminada'); };
+    r.querySelector('#cd-done')?.addEventListener('click', () => { c.estado = 'asistida'; persist(); render(); afterVisit(c); });
+  });
+  draw();
+}
+
+function afterVisit(c) {
+  openDialog(`${head('¿Qué dejó la cita?')}
+    <p class="muted" style="margin:0">Anótalo ahora y te avisamos a tiempo. Deja en blanco lo que no aplique.</p>
+    <div class="fields">
+      <label class="f full">Control indicado<input id="av-ctl" value="${esc(c.especialidad || '')}"></label>
+      <label class="f full">¿En cuánto tiempo?<select id="av-plazo"><option value="">No dejó control</option><option value="15">15 días</option><option value="30">1 mes</option><option value="60">2 meses</option><option value="90">3 meses</option><option value="180">6 meses</option><option value="365">1 año</option></select></label>
+      <label class="f full">Orden o autorización nueva<input id="av-aut" placeholder="Ej.: Ecocardiograma"></label>
+      <label class="f">Vence el<input type="date" id="av-vence"></label>
+      <label class="f">N.° de autorización<input id="av-num" placeholder="Opcional"></label>
+    </div>
+    <div class="dlg-foot"><button class="btn" id="av-skip">No dejó nada</button><button class="btn primary" id="av-save">Guardar</button></div>`, r => {
+    r.querySelector('#av-skip').onclick = () => { dlg.close(); toast('Cita guardada en el historial'); };
+    r.querySelector('#av-save').onclick = () => {
+      const plazo = val(r, 'av-plazo'), ctl = val(r, 'av-ctl'), aut = val(r, 'av-aut');
+      if (plazo && ctl) S.controles.push({ id: uid(), miembroId: c.miembroId, especialidad: ctl, fecha: addDays(todayISO(), +plazo), estado: 'pendiente', origen: `Indicado en la cita del ${fmtDate(c.fecha)}` });
+      if (aut) S.auts.push({ id: uid(), miembroId: c.miembroId, servicio: aut, numero: val(r, 'av-num'), exp: todayISO(), vence: val(r, 'av-vence'), estado: 'vigente' });
+      persist(); dlg.close(); render(); toast(plazo || aut ? 'Anotado. Te avisamos a tiempo.' : 'Cita guardada en el historial');
+    };
+  });
+}
+
+function openCitaForm(pre = {}) {
+  if (!S.miembros.length) { openMember(); return; }
+  const editing = !!pre.id && S.citas.some(x => x.id === pre.id);
+  const c = editing ? pre : Object.assign({ tipo: 'medica', estado: 'pendiente', fecha: pre.fecha || addDays(todayISO(), 1), hora: '' }, pre);
+  openDialog(`${head(editing ? 'Editar cita' : pre.fromAI ? 'Revisa y guarda' : 'Nueva cita')}
+    ${pre.fromAI ? `<div class="answer" style="margin:0"><b style="color:var(--ai)">${ic('spark')} Llené esto con lo que escribiste. Revisa antes de guardar.</b></div>` : ''}
+    ${!editing && !pre.fromAI ? `<details class="answer" style="margin:0" ${pre.photo ? 'open' : ''}><summary style="cursor:pointer;font-weight:700;color:var(--ai)">${ic('spark')} Leer mensaje${photoOn() ? ' o foto' : ''} de la EPS</summary>
+      <div style="display:grid;gap:10px;margin-top:10px"><label class="f"><span class="small">Mensaje</span><textarea id="ai-text" placeholder="Ej.: Su cita de medicina interna quedó asignada para el 14/11 a las 7:40 a. m. en la sede norte…"></textarea></label>
+      ${photoOn() ? `<label class="f"><span class="small">Foto de la orden, autorización o del mensaje (opcional)</span><input type="file" id="ai-img" accept="image/*"></label>` : ''}
+      <div class="row"><span class="small muted" id="ai-status">${aiOn() ? 'Revisa siempre los datos antes de guardar.' : 'La lectura automática necesita una cuenta. Llena el formulario.'}</span><button class="btn sm" type="button" id="ai-go" ${aiOn() ? '' : 'disabled'}>Leer y llenar</button></div></div></details>` : ''}
+    <div class="fields">
+      <label class="f">Persona<select id="cf-m">${memberOptions(c.miembroId || (filter !== 'todos' ? filter : S.miembros[0].id))}</select></label>
+      <label class="f">Tipo<select id="cf-tipo">${Object.entries(TIPOS).map(([k, t]) => `<option value="${k}" ${k === c.tipo ? 'selected' : ''}>${t.label}</option>`).join('')}</select></label>
+      <label class="f full">Especialidad o motivo<input id="cf-esp" value="${esc(c.especialidad || '')}" placeholder="Ej.: Medicina interna"></label>
+      <label class="f">Fecha<input type="date" id="cf-fecha" value="${esc(c.fecha || '')}"></label>
+      <label class="f">Hora<input type="time" id="cf-hora" value="${esc(c.hora || '')}"></label>
+      <label class="f full">Lugar<input id="cf-lugar" value="${esc(c.lugar || '')}" placeholder="Clínica, sede y consultorio"></label>
+      <label class="f">Profesional<input id="cf-prof" value="${esc(c.profesional || '')}" placeholder="Opcional"></label>
+      <label class="f">Quién acompaña<input id="cf-acomp" value="${esc(c.acompana || '')}" placeholder="Opcional"></label>
+      ${!editing ? `<label class="f">Se repite<select id="cf-rep"><option value="0">No se repite</option><option value="7">Cada semana</option><option value="14">Cada 2 semanas</option><option value="m">Cada mes</option></select></label>
+      <label class="f" id="cf-veces-w" hidden>¿Cuántas citas en total?<input type="number" id="cf-veces" min="2" max="30" value="4" inputmode="numeric"></label>` : ''}
+      <label class="f full">Notas<textarea id="cf-notas">${esc(c.notas || '')}</textarea></label>
+    </div>
+    <div class="notice" id="cf-warn" hidden></div>
+    <div class="dlg-foot"><button class="btn" id="cf-cancel">Cancelar</button><button class="btn primary" id="cf-save">Guardar cita</button></div>`, r => {
+    let extraReq = pre.extraReq || null, aiAut = null, warned = false;
+    r.querySelector('#cf-rep')?.addEventListener('change', e => { r.querySelector('#cf-veces-w').hidden = e.target.value === '0'; });
+    ['cf-fecha', 'cf-hora', 'cf-m', 'cf-acomp'].forEach(id => r.querySelector('#' + id).addEventListener('change', () => { warned = false; r.querySelector('#cf-warn').hidden = true; r.querySelector('#cf-save').textContent = 'Guardar cita'; }));
+    r.querySelector('#cf-cancel').onclick = () => dlg.close();
+    r.querySelector('#ai-go')?.addEventListener('click', async () => {
+      const text = val(r, 'ai-text'); const file = r.querySelector('#ai-img')?.files?.[0]; const status = r.querySelector('#ai-status'); const btn = r.querySelector('#ai-go');
+      if (!text && !file) { status.textContent = 'Pega el mensaje o sube una foto.'; return; }
+      btn.disabled = true; status.textContent = 'Leyendo…';
+      try {
+        const prompt = `Extrae los datos de una cita a partir de un mensaje de EPS, IPS, laboratorio o colegio en Colombia. Hoy es ${todayISO()}.
+Personas: ${S.miembros.map(m => m.nombre).join(', ')}. Tipos válidos: ${Object.keys(TIPOS).join(', ')}.
+Devuelve SOLO JSON: {"persona": nombre exacto o null, "tipo", "especialidad", "fecha":"YYYY-MM-DD" (si no hay año, el próximo que ocurra), "hora":"HH:MM" o null, "lugar", "profesional", "requisitos":[...], "autorizacion":{"numero","vence"} o null}. Usa null si un dato no aparece. No inventes.
+${text ? 'Mensaje:\n' + text : 'Lee la imagen adjunta.'}`;
+        const out = sampleApi ? await sampleApi.json(prompt, file && sampleImages ? { images: [file], modelTier: 'default' } : { modelTier: 'default' })
+          : await aiCall({ mode: 'foto', text, personas: S.miembros.map(m => m.nombre), image: file ? await shrinkImage(file) : null });
+        const pm = findPerson(out.persona); if (pm) r.querySelector('#cf-m').value = pm.id;
+        if (out.tipo && TIPOS[out.tipo]) r.querySelector('#cf-tipo').value = out.tipo;
+        const setv = (id, v) => { if (v) r.querySelector('#' + id).value = v; };
+        setv('cf-esp', out.especialidad); setv('cf-fecha', okDate(out.fecha)); setv('cf-hora', /^\d{2}:\d{2}$/.test(out.hora || '') ? out.hora : ''); setv('cf-lugar', out.lugar); setv('cf-prof', out.profesional);
+        extraReq = Array.isArray(out.requisitos) ? out.requisitos : null;
+        aiAut = out.autorizacion && (out.autorizacion.numero || out.autorizacion.vence) ? out.autorizacion : null;
+        status.textContent = 'Listo. Revisa los datos y guarda.';
+      } catch (e) { status.textContent = e && e.code === 'not_granted' ? 'Sin permiso para la lectura automática.' : 'No pude leerlo. Llena el formulario.'; }
+      finally { btn.disabled = false; }
+    });
+    r.querySelector('#cf-save').onclick = () => {
+      const fecha = val(r, 'cf-fecha'); if (!fecha) { r.querySelector('#cf-fecha').focus(); toast('Falta la fecha'); return; }
+      const tipo = val(r, 'cf-tipo');
+      const data = { miembroId: val(r, 'cf-m'), tipo, especialidad: val(r, 'cf-esp'), fecha, hora: val(r, 'cf-hora'), lugar: val(r, 'cf-lugar'), profesional: val(r, 'cf-prof'), acompana: val(r, 'cf-acomp'), notas: val(r, 'cf-notas') };
+      if (!warned) {
+        const clash = findClash(data, editing ? c.id : null);
+        if (clash) { warned = true; const w = r.querySelector('#cf-warn'); w.hidden = false; w.textContent = clash; r.querySelector('#cf-save').textContent = 'Guardar de todas formas'; return; }
+      }
+      if (editing) Object.assign(S.citas.find(x => x.id === c.id), data);
+      else {
+        const base = TIPOS[tipo].req.map(t => ({ t, ok: false }));
+        (extraReq || []).filter(t => typeof t === 'string' && t.trim()).slice(0, 8).forEach(t => { if (!base.some(b => b.t.toLowerCase() === t.toLowerCase())) base.push({ t, ok: false }); });
+        const nc = Object.assign({ id: uid(), estado: 'pendiente', req: base }, data); S.citas.push(nc);
+        const rp = val(r, 'cf-rep'), veces = Math.min(30, Math.max(2, +val(r, 'cf-veces') || 2));
+        if (rp && rp !== '0') { const [y, mo, d] = fecha.split('-').map(Number); for (let i = 1; i < veces; i++) { const f = rp === 'm' ? isoLocal(new Date(y, mo - 1 + i, d)) : addDays(fecha, i * +rp); S.citas.push(Object.assign({}, data, { id: uid(), estado: 'pendiente', fecha: f, req: base.map(b => ({ t: b.t, ok: false })) })); } }
+        if (pre.controlId) { const k = S.controles.find(x => x.id === pre.controlId); if (k) k.estado = 'agendado'; }
+        if (pre.autId) { const a = S.auts.find(x => x.id === pre.autId); if (a) { a.estado = 'usada'; a.citaId = nc.id; } }
+        if (aiAut) S.auts.push({ id: uid(), miembroId: data.miembroId, servicio: data.especialidad || TIPOS[tipo].label, numero: aiAut.numero || '', exp: todayISO(), vence: okDate(aiAut.vence), estado: 'usada', citaId: nc.id });
+      }
+      persist(); dlg.close(); answer = null; render(); const rp2 = r.querySelector('#cf-rep')?.value; toast(editing ? 'Cita actualizada' : rp2 && rp2 !== '0' ? 'Citas guardadas' : `Cita guardada · ${fmtDate(fecha)}`);
+    };
+  });
+}
+
+function openMember(id) {
+  const m = id ? member(id) : { color: COLORS[S.miembros.length % COLORS.length] };
+  openDialog(`${head(id ? 'Editar persona' : 'Agregar persona')}
+    <div class="fields">
+      <label class="f full">Nombre<input id="mm-n" value="${esc(m.nombre || '')}" placeholder="Nombre y apellido"></label>
+      <label class="f">Parentesco<input id="mm-p" value="${esc(m.parentesco || '')}" placeholder="Yo, hija, mamá…" list="parentescos"><datalist id="parentescos"><option>Yo</option><option>Pareja</option><option>Hija</option><option>Hijo</option><option>Mamá</option><option>Papá</option><option>Abuela</option><option>Abuelo</option></datalist></label>
+      <label class="f">Fecha de nacimiento<input type="date" id="mm-nac" value="${esc(m.nac || '')}"></label>
+      <label class="f">EPS<input id="mm-eps" value="${esc(m.eps || '')}" list="eps-list" placeholder="Escribe o elige"><datalist id="eps-list">${EPS.map(e => `<option>${esc(e.n)}</option>`).join('')}</datalist></label>
+      <label class="f">Régimen<select id="mm-reg"><option value="">No sé</option><option value="contributivo" ${m.regimen === 'contributivo' ? 'selected' : ''}>Contributivo</option><option value="subsidiado" ${m.regimen === 'subsidiado' ? 'selected' : ''}>Subsidiado</option></select></label>
+      <label class="f">Documento<input id="mm-doc" value="${esc(m.doc || '')}" placeholder="CC, TI o RC y número"></label>
+      <p class="small muted full" style="margin:0">¿No sabes a qué EPS está afiliado? <a href="${ADRES_URL}" target="_blank" rel="noopener">Consúltalo en ADRES</a>.</p>
+      <label class="f full">Alergias<input id="mm-al" value="${esc(m.alergias || '')}" placeholder="Opcional"></label>
+      <label class="f full">Notas para las citas<textarea id="mm-no" placeholder="Ej.: usa audífono">${esc(m.notas || '')}</textarea></label>
+    </div>
+    ${!id && S.miembros.length ? '<p class="small muted" style="margin:0">Si registras a otra persona adulta, asegúrate de tener su autorización para guardar sus datos de salud.</p>' : ''}
+    <div class="dlg-foot">${id ? '<button class="btn ghost danger" id="mm-del">Eliminar</button>' : ''}<button class="btn" id="mm-cancel">Cancelar</button><button class="btn primary" id="mm-save">Guardar</button></div>`, r => {
+    r.querySelector('#mm-cancel').onclick = () => dlg.close();
+    r.querySelector('#mm-del')?.addEventListener('click', () => openConfirm('¿Eliminar a ' + m.nombre + '?', 'También se eliminan sus citas, órdenes, controles y medicamentos.', 'Eliminar', () => {
+      S.miembros = S.miembros.filter(x => x.id !== id); ['citas', 'auts', 'controles', 'meds'].forEach(k => S[k] = S[k].filter(x => x.miembroId !== id)); if (filter === id) filter = 'todos'; persist(); render(); toast('Persona eliminada');
+    }));
+    r.querySelector('#mm-save').onclick = () => {
+      const n = val(r, 'mm-n'); if (!n) { r.querySelector('#mm-n').focus(); toast('Falta el nombre'); return; }
+      const data = { nombre: n, parentesco: val(r, 'mm-p'), nac: val(r, 'mm-nac'), eps: val(r, 'mm-eps'), regimen: val(r, 'mm-reg'), doc: val(r, 'mm-doc'), alergias: val(r, 'mm-al'), notas: val(r, 'mm-no') };
+      if (id) Object.assign(m, data); else S.miembros.push(Object.assign({ id: uid(), color: m.color }, data));
+      persist(); dlg.close(); render(); toast(id ? 'Datos actualizados' : `${n.split(' ')[0]} agregado a la familia`);
+    };
+  });
+}
+
+function openAut(id, pre = {}) {
+  if (!S.miembros.length) { openMember(); return; }
+  const a = id ? S.auts.find(x => x.id === id) : Object.assign({ exp: todayISO() }, pre);
+  openDialog(`${head(id ? 'Orden o autorización' : 'Nueva orden o autorización')}
+    <div class="fields">
+      <label class="f">Persona<select id="au-m">${memberOptions(a.miembroId)}</select></label>
+      <label class="f">N.° de autorización<input id="au-num" value="${esc(a.numero || '')}" placeholder="Opcional"></label>
+      <label class="f full">Servicio<input id="au-s" value="${esc(a.servicio || '')}" placeholder="Ej.: Resonancia de rodilla"></label>
+      <label class="f">Expedida el<input type="date" id="au-exp" value="${esc(a.exp || '')}"></label>
+      <label class="f">Vence el<input type="date" id="au-v" value="${esc(a.vence || '')}"></label>
+    </div>
+    <div class="dlg-foot">${id ? `<button class="btn ghost danger" id="au-del">Eliminar</button>${a.estado !== 'usada' ? '<button class="btn" id="au-used">Ya la usé</button>' : ''}` : ''}<button class="btn" id="au-cancel">Cancelar</button><button class="btn primary" id="au-save">Guardar</button></div>`, r => {
+    r.querySelector('#au-cancel').onclick = () => dlg.close();
+    r.querySelector('#au-del')?.addEventListener('click', () => { dlg.close(); removeWithUndo('auts', id, 'Autorización eliminada'); });
+    r.querySelector('#au-used')?.addEventListener('click', () => { a.estado = 'usada'; persist(); dlg.close(); render(); toast('Marcada como usada'); });
+    r.querySelector('#au-save').onclick = () => {
+      const s = val(r, 'au-s'); if (!s) { r.querySelector('#au-s').focus(); toast('Falta el servicio'); return; }
+      const data = { miembroId: val(r, 'au-m'), numero: val(r, 'au-num'), servicio: s, exp: val(r, 'au-exp'), vence: val(r, 'au-v') };
+      if (id) Object.assign(a, data); else S.auts.push(Object.assign({ id: uid(), estado: 'vigente' }, data));
+      persist(); dlg.close(); answer = null; view = 'salud'; salud = 'ordenes'; render(); toast('Autorización guardada');
+    };
+  });
+}
+
+function openCtl(pre = {}) {
+  if (!S.miembros.length) { openMember(); return; }
+  openDialog(`${head('Nuevo control')}
+    <div class="fields">
+      <label class="f">Persona<select id="ct-m">${memberOptions(pre.miembroId)}</select></label>
+      <label class="f">Para cuándo<input type="date" id="ct-f" value="${esc(pre.fecha || addDays(todayISO(), 90))}"></label>
+      <label class="f full">Especialidad<input id="ct-e" value="${esc(pre.especialidad || '')}" placeholder="Ej.: Cardiología"></label>
+      <label class="f full">De dónde salió<input id="ct-o" placeholder="Opcional"></label>
+    </div>
+    <div class="dlg-foot"><button class="btn" id="ct-cancel">Cancelar</button><button class="btn primary" id="ct-save">Guardar</button></div>`, r => {
+    r.querySelector('#ct-cancel').onclick = () => dlg.close();
+    r.querySelector('#ct-save').onclick = () => {
+      const e = val(r, 'ct-e'); if (!e) { r.querySelector('#ct-e').focus(); toast('Falta la especialidad'); return; }
+      S.controles.push({ id: uid(), miembroId: val(r, 'ct-m'), especialidad: e, fecha: val(r, 'ct-f'), estado: 'pendiente', origen: val(r, 'ct-o') });
+      persist(); dlg.close(); answer = null; view = 'salud'; salud = 'controles'; render(); toast('Control guardado');
+    };
+  });
+}
+
+function openMed(id, pre = {}) {
+  if (!S.miembros.length) { openMember(); return; }
+  const md = id ? S.meds.find(x => x.id === id) : pre;
+  openDialog(`${head(id ? 'Medicamento' : 'Nuevo medicamento')}
+    <div class="fields">
+      <label class="f">Persona<select id="md-m">${memberOptions(md.miembroId)}</select></label>
+      <label class="f">Próxima entrega<input type="date" id="md-p" value="${esc(md.proxima || '')}"></label>
+      <label class="f full">Medicamento<input id="md-n" value="${esc(md.nombre || '')}" placeholder="Nombre y concentración"></label>
+      <label class="f">Dosis<input id="md-d" value="${esc(md.dosis || '')}" placeholder="Ej.: 1 tableta"></label>
+      <label class="f">Frecuencia<input id="md-f" value="${esc(md.frecuencia || '')}" placeholder="Ej.: cada 12 horas"></label>
+    </div>
+    <div class="dlg-foot">${id ? '<button class="btn ghost danger" id="md-del">Eliminar</button><button class="btn" id="md-next">Ya la reclamé (+30 días)</button>' : ''}<button class="btn" id="md-cancel">Cancelar</button><button class="btn primary" id="md-save">Guardar</button></div>`, r => {
+    r.querySelector('#md-cancel').onclick = () => dlg.close();
+    r.querySelector('#md-del')?.addEventListener('click', () => { dlg.close(); removeWithUndo('meds', id, 'Medicamento eliminado'); });
+    r.querySelector('#md-next')?.addEventListener('click', () => { md.proxima = addDays(md.proxima && daysUntil(md.proxima) > 0 ? md.proxima : todayISO(), 30); persist(); dlg.close(); render(); toast('Próxima entrega: ' + fmtDate(md.proxima)); });
+    r.querySelector('#md-save').onclick = () => {
+      const n = val(r, 'md-n'); if (!n) { r.querySelector('#md-n').focus(); toast('Falta el medicamento'); return; }
+      const data = { miembroId: val(r, 'md-m'), proxima: val(r, 'md-p'), nombre: n, dosis: val(r, 'md-d'), frecuencia: val(r, 'md-f') };
+      if (id) Object.assign(md, data); else S.meds.push(Object.assign({ id: uid() }, data));
+      persist(); dlg.close(); answer = null; view = 'salud'; salud = 'meds'; render(); toast('Medicamento guardado');
+    };
+  });
+}
+
+// ---------- clash detection ----------
+function findClash(data, exceptId) {
+  if (!data.hora) return null;
+  const t = toDate(data.fecha, data.hora).getTime();
+  for (const o of S.citas) {
+    if (o.id === exceptId || !ACTIVE(o) || o.fecha !== data.fecha || !o.hora) continue;
+    const diff = Math.abs(toDate(o.fecha, o.hora).getTime() - t) / 6e4;
+    if (diff >= 90) continue;
+    if (o.miembroId === data.miembroId) return `Ojo: ${first(member(o.miembroId))} ya tiene ${citaTitle(o)} ese día a las ${fmtHora(o.hora)}`;
+    if (data.acompana && o.acompana && data.acompana.trim().toLowerCase() === o.acompana.trim().toLowerCase()) return `Ojo: ${o.acompana} ya acompaña a ${first(member(o.miembroId))} ese día a las ${fmtHora(o.hora)}`;
+  }
+  return null;
+}
+
+// ---------- ayuda ----------
+const FAQ = [
+  ['¿Quién puede ver mis datos?', 'Solo tú, entrando con tu correo y contraseña. Los datos viajan cifrados (HTTPS) y se guardan separados por cuenta. No los vendemos ni los compartimos. Puedes leer la política completa en Ajustes > Privacidad.'],
+  ['¿La app pide la cita por mí?', 'No. Te muestra los canales oficiales de tu EPS (web, WhatsApp, app y teléfonos), te da el texto de qué decir y te ayuda a hacer seguimiento si no te responden.'],
+  ['¿Cómo hago para que me lleguen alertas al celular?', 'Conecta tu calendario en Ajustes > Conectar mi calendario. Tus citas, vencimientos de autorizaciones y controles aparecen solos en Google Calendar o en el calendario del iPhone. En Google Calendar, activa las notificaciones del calendario "Familia al Día" en su configuración. También puedes tocar "Calendario" en una cita para agregarla una por una.'],
+  ['¿Cómo leo la foto de una orden o el mensaje de la EPS?', 'Toca + y elige "Leer una foto o mensaje de la EPS". Sube la foto o pega el SMS y toca "Leer y llenar". Revisa siempre los datos antes de guardar: la lectura puede equivocarse.'],
+  ['¿Puedo compartir la agenda con mi familia?', 'Por ahora cada cuenta es personal. Puedes enviar el resumen de la semana por WhatsApp (Agenda > Enviar la semana) o darle el enlace de tu calendario a alguien de confianza: verá las citas, pero no podrá cambiarlas. Ojo: cualquiera que tenga ese enlace puede verlas.'],
+  ['¿Qué pasa cuando terminan los 14 días gratis?', 'Puedes seguir viendo y exportando tus datos, pero los cambios no se guardan ni funciona el asistente hasta que actives tu plan. No perdemos tu información.'],
+  ['¿Cómo pago y cuánto cuesta?', `${PAGO.mensual} o ${PAGO.anual}. En Ajustes > Activar plan están los pasos: pagas con el link y nos envías el comprobante con el correo de tu cuenta. Lo activamos en menos de 24 horas hábiles.`],
+  ['Olvidé mi contraseña', 'En la pantalla de entrada toca "Olvidé mi contraseña", escribe tu correo y abre el enlace que te llega (revisa también spam).'],
+  ['¿Cómo borro mis datos o mi cuenta?', `En Ajustes > Privacidad > Borrar mis datos se eliminan todas tus citas y personas. Para eliminar también tu usuario, escríbenos a ${PAGO.correo}.`],
+  ['No sé a qué EPS está afiliado alguien', 'Cuando agregas o editas una persona, toca "Consúltalo en ADRES". Es la consulta oficial con el número de documento.'],
+];
+function ayudaHTML() {
+  const steps = [['Agrega a tu familia', 'Cada persona con su EPS y documento.', 'familia', 'Ir a Familia'], ['Guarda o pide tus citas', 'Con el botón + de abajo.', 'plus', 'Abrir +'], ['Conecta tu calendario', 'Para que te lleguen las alertas al celular.', 'calendar', 'Conectar'], ['Anota órdenes y controles', 'Te avisamos antes de que se venzan.', 'plus', 'Abrir +'], ['Instálala en tu celular', 'Queda como una app más.', 'install', 'Cómo hacerlo']];
+  return `<div class="sec" style="margin-top:8px"><div class="sec-head"><h2>Ayuda</h2></div>
+    <div class="answer" style="margin:0"><b style="color:var(--ai)">${ic('spark')} Pregúntale a la app</b>
+      <form id="helpForm" style="display:flex;gap:8px"><label class="sr" for="helpIn">Tu pregunta</label><input id="helpIn" placeholder="Ej.: ¿cómo conecto mi calendario?" style="flex:1;min-width:0;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)"><button class="btn primary sm" type="submit">Preguntar</button></form>
+      <p id="helpOut" class="small" style="margin:0;white-space:pre-wrap"></p></div>
+    <div class="label">Primeros pasos</div>
+    ${steps.map(([t, d, k, b], i) => `<div class="card"><div class="row"><span class="grow"><b>${i + 1}. ${t}</b><br><span class="small muted">${d}</span></span><button class="btn sm" data-faq-go="${k}">${b}</button></div></div>`).join('')}
+    <div class="label">Preguntas frecuentes</div>
+    ${FAQ.map(([q, a], i) => `<details class="card" data-faq="${i}"><summary style="cursor:pointer;font-weight:700">${esc(q)}</summary><p class="small" style="margin:6px 0 0">${esc(a)}</p></details>`).join('')}
+    <div class="card"><b>¿Necesitas ayuda de una persona?</b><span class="small">Escríbenos a <span class="mono">${esc(PAGO.correo)}</span>${PAGO.whatsapp ? ` o por <a href="https://wa.me/${PAGO.whatsapp}" target="_blank" rel="noopener">WhatsApp</a>` : ''}.</span><button class="btn sm" data-copy-mail style="width:fit-content">Copiar correo</button></div>
+  </div>`;
+}
+async function askHelp(q) {
+  const out = $('#helpOut'); if (!q || !out) return;
+  const words = q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/\W+/).filter(w => w.length > 3);
+  const score = ([fq, fa]) => { const t = (fq + ' ' + fa).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); return words.filter(w => t.includes(w)).length; };
+  const local = () => { const best = FAQ.map((f, i) => [score(f), i]).sort((a, b) => b[0] - a[0])[0]; if (best && best[0] > 0) { out.textContent = FAQ[best[1]][1]; const d = document.querySelector(`[data-faq="${best[1]}"]`); if (d) d.open = true; } else out.textContent = `No encontré una respuesta. Escríbenos a ${PAGO.correo}.`; };
+  if (mode !== 'netlify') { local(); return; }
+  out.textContent = 'Pensando…';
+  try { const r = await aiCall({ mode: 'ayuda', q }); out.textContent = r.texto || ''; } catch (_) { local(); }
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-copy-mail]')) copyText(PAGO.correo); });
+
+// ---------- plan, calendario, exportar, admin ----------
+function openPlan() {
+  const est = acct ? (acct.plan === 'pago' ? `Tu plan está activo hasta el ${fmtLong(String(acct.hasta).slice(0, 10))}.` : acct.plan === 'prueba' ? `Estás en la prueba gratis: te quedan ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}.` : 'Tu prueba gratis terminó.') : '';
+  const msg = `Hola, quiero activar Familia al Día. Mi correo de cuenta es ${acct ? acct.email : ''}. Adjunto el comprobante de pago.`;
+  openDialog(`${head('Tu plan')}
+    <p style="margin:0">${esc(est)}</p>
+    <div class="feat" style="grid-template-columns:1fr 1fr"><div><b>Mensual</b><span>${esc(PAGO.mensual)}</span></div><div><b>Anual</b><span>${esc(PAGO.anual)}</span><span class="small muted">Ahorras 2 meses</span></div></div>
+    <span class="small">Incluye: personas ilimitadas, asistente con IA, lectura de fotos, calendario conectado, avisos y canales de todas las EPS.</span>
+    <ol style="margin:0;padding-left:1.2em;display:grid;gap:6px">
+      <li>Paga con ${PAGO.linkMensual || PAGO.linkAnual ? 'uno de estos links' : 'el link que te enviamos por correo o WhatsApp'}.</li>
+      <li>Envíanos el comprobante con el correo de tu cuenta.</li>
+      <li>Activamos tu plan en menos de 24 horas hábiles.</li>
+    </ol>
+    <div class="actions">${PAGO.linkMensual ? `<a class="btn primary" href="${esc(PAGO.linkMensual)}" target="_blank" rel="noopener">Pagar mensual</a>` : ''}${PAGO.linkAnual ? `<a class="btn ${PAGO.linkMensual ? '' : 'primary'}" href="${esc(PAGO.linkAnual)}" target="_blank" rel="noopener">Pagar anual</a>` : ''}
+      ${PAGO.whatsapp ? `<a class="btn" href="https://wa.me/${PAGO.whatsapp}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('share')} Enviar comprobante</a>` : ''}
+      <button class="btn" id="pl-mail">${ic('copy')} Copiar correo de pagos</button></div>
+    <p class="small muted" style="margin:0">Escribe a <span class="mono">${esc(PAGO.correo)}</span> con el asunto “Activar plan”.</p>`, r => { r.querySelector('#pl-mail').onclick = () => copyText(PAGO.correo); });
+}
+function openCalendar() {
+  if (!acct || !acct.calUrl) { toast('Entra con tu cuenta para conectar el calendario'); return; }
+  const url = acct.calUrl, webcal = url.replace(/^https?:/, 'webcal:');
+  openDialog(`${head('Conectar mi calendario')}
+    <p style="margin:0">Copia este enlace privado y agrégalo una sola vez. Después tus citas, controles y vencimientos aparecen solos.</p>
+    <div class="answer" style="margin:0"><span class="mono small" style="overflow-wrap:anywhere">${esc(url)}</span><div class="row"><span></span><button class="btn sm primary" id="cl-copy">${ic('copy')} Copiar enlace</button></div></div>
+    <div class="card"><b>Google Calendar</b><span class="small">1. En un computador, abre calendar.google.com.<br>2. A la izquierda, junto a “Otros calendarios”, toca <b>+</b> y elige <b>Desde URL</b>.<br>3. Pega el enlace y toca <b>Agregar calendario</b>.<br>4. En la configuración de “Familia al Día”, activa las notificaciones.<br>Se ve en el celular con la app de Google Calendar. Google puede tardar varias horas en mostrar los cambios.</span><a class="btn sm" href="https://calendar.google.com/calendar/u/0/r/settings/addbyurl" target="_blank" rel="noopener">Abrir Google Calendar</a></div>
+    <div class="card"><b>iPhone</b><span class="small">Toca el botón y confirma “Suscribirse”. O ve a Ajustes > Calendario > Cuentas > Añadir cuenta > Otra > Añadir calendario suscrito, y pega el enlace.</span><a class="btn sm" href="${esc(webcal)}">Suscribirme en el iPhone</a></div>
+    <p class="small muted" style="margin:0">Es un enlace privado: no lo publiques. Quien lo tenga puede ver tus citas.</p>`, r => { r.querySelector('#cl-copy').onclick = () => copyText(url); });
+}
+async function exportCSV() {
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = [['Persona', 'Tipo', 'Especialidad', 'Fecha', 'Hora', 'Lugar', 'Profesional', 'Acompaña', 'Estado', 'Qué llevar', 'Notas']].concat([...S.citas].sort(sortCitas).map(c => [member(c.miembroId)?.nombre || '', TIPOS[c.tipo]?.label || '', c.especialidad || '', c.fecha, c.hora || '', c.lugar || '', c.profesional || '', c.acompana || '', ESTADOS[c.estado] || c.estado, (c.req || []).map(r => r.t + (r.ok ? ' ✓' : '')).join('; '), c.notas || '']));
+  const data = '﻿' + rows.map(r => r.map(q).join(',')).join('\r\n');
+  const filename = `familia-al-dia-citas-${todayISO()}.csv`;
+  if (downloadsApi) { try { await downloadsApi.save({ filename, data }); toast('Archivo guardado. En Google Sheets: Archivo > Importar > Subir.'); } catch (e) { if (!e || e.code !== 'declined') toast('No se pudo exportar'); } return; }
+  try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'text/csv' })); a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast('Descargado. En Google Sheets: Archivo > Importar > Subir.'); } catch (_) { toast('No se pudo exportar'); }
+}
+async function doLogout() {
+  try { await netlifyId.logout(); } catch (_) {}
+  authUser = null; acct = null; isAdminUser = false; S = emptyState(); mode = 'auth'; view = 'inicio'; setStatus(); renderAuth('entrar', 'Cerraste sesión.');
+}
+async function openAdmin() {
+  openDialog(`${head('Administración')}<p class="muted" style="margin:0">Cargando clientes…</p>`);
+  let j; try { const r = await fetch('/api/admin', { credentials: 'same-origin' }); j = await r.json(); if (!r.ok) throw new Error(j.error); } catch (e) { openDialog(`${head('Administración')}<p style="margin:0">${esc(e.message || 'No se pudo cargar.')}</p>`); return; }
+  const draw = (filt = '') => openDialog(`${head('Administración')}
+    <div class="feat" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div><b>${j.total}</b><span class="small muted">cuentas</span></div><div><b>${j.prueba}</b><span class="small muted">en prueba</span></div><div><b>${j.pagos}</b><span class="small muted">pagando</span></div></div>
+    <label class="f">Buscar por correo<input id="ad-q" value="${esc(filt)}" inputmode="email"></label>
+    <div style="display:grid;gap:8px">${j.cuentas.filter(c => !filt || (c.email || '').toLowerCase().includes(filt.toLowerCase())).slice(0, 80).map(c => `<div class="card" style="gap:8px"><div class="row"><span class="grow"><b style="overflow-wrap:anywhere">${esc(c.email || c.userId)}</b><br><span class="small muted">Creada ${fmtDate(c.creada.slice(0, 10))}${c.notas ? ' · ' + esc(c.notas) : ''}</span></span><span class="badge ${c.plan === 'pago' ? 'good' : c.plan === 'prueba' ? 'accent' : 'crit'}">${c.plan === 'pago' ? 'Pago hasta ' + fmtDate(String(c.hasta).slice(0, 10)) : c.plan === 'prueba' ? 'Prueba · ' + c.dias + ' d' : 'Vencido'}</span></div>
+      <div class="chips"><button class="btn sm primary" data-ad="mes" data-u="${esc(c.userId)}">+1 mes</button><button class="btn sm" data-ad="anio" data-u="${esc(c.userId)}">+1 año</button><button class="btn sm" data-ad="prueba7" data-u="${esc(c.userId)}">+7 días prueba</button>${c.plan === 'pago' ? `<button class="btn sm danger" data-ad="quitar" data-u="${esc(c.userId)}">Quitar plan</button>` : ''}</div></div>`).join('') || '<span class="muted">Sin resultados.</span>'}</div>`, r => {
+    const q = r.querySelector('#ad-q'); q.oninput = () => { clearTimeout(q._t); q._t = setTimeout(() => { draw(q.value.trim()); setTimeout(() => { const n = $('#ad-q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 0); }, 300); };
+    r.querySelectorAll('[data-ad]').forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try { const res = await fetch('/api/admin', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId: b.dataset.u, accion: b.dataset.ad }) }); const k = await res.json(); if (!res.ok) throw new Error(k.error); const i = j.cuentas.findIndex(c => c.userId === b.dataset.u); j.cuentas[i] = Object.assign(j.cuentas[i], k.cuenta); j.pagos = j.cuentas.filter(c => c.plan === 'pago').length; j.prueba = j.cuentas.filter(c => c.plan === 'prueba').length; toast('Listo'); draw(q.value.trim()); } catch (e) { toast(e.message || 'No se pudo'); b.disabled = false; }
+    });
+  });
+  draw();
+}
+
+// ---------- quick add sheet ----------
+function openPlus() {
+  if (!S.miembros.length) { openMember(); return; }
+  const opt = (id, icon, t, sub, primary) => `<button class="card" id="${id}" style="grid-template-columns:auto 1fr;column-gap:14px;align-items:center${primary ? ';border-color:var(--accent)' : ''}"><span class="opt-ic">${ic(icon)}</span><span><b>${t}</b><br><span class="small muted">${sub}</span></span></button>`;
+  openDialog(`${head('¿Qué necesitas hacer?')}
+    ${opt('pl-pedir', 'cal', 'Pedir una cita', 'Te mostramos cómo pedirla en tu EPS y qué decir.', true)}
+    ${opt('pl-cita', 'check', 'Ya tengo una cita: guardarla', 'Fecha, hora, lugar y qué llevar.')}
+    ${photoOn() ? opt('pl-foto', 'doc', 'Leer una foto o mensaje de la EPS', 'Toma foto a la orden o pega el SMS y llenamos la cita.') : ''}
+    ${opt('pl-aut', 'doc', 'Guardar una orden o autorización', 'Te avisamos antes de que se venza.')}
+    ${opt('pl-ctl', 'pulse', 'Anotar un control', '“Control en 3 meses”: te avisamos cuándo pedirlo.')}
+    ${opt('pl-med', 'pill', 'Anotar un medicamento', 'Te recordamos la próxima entrega.')}`, r => {
+    r.querySelector('#pl-pedir').onclick = () => openPedir({});
+    r.querySelector('#pl-cita').onclick = () => openCitaForm();
+    r.querySelector('#pl-foto')?.addEventListener('click', () => openCitaForm({ photo: true }));
+    r.querySelector('#pl-aut').onclick = () => openAut();
+    r.querySelector('#pl-ctl').onclick = () => openCtl();
+    r.querySelector('#pl-med').onclick = () => openMed();
+  });
+}
+
+// ---------- request an appointment from the EPS ----------
+function scriptFor(m, que, pre) {
+  return `Hola, quiero solicitar una cita${que ? ' de ' + que : ''} para ${m?.nombre || ''}${m?.doc ? ', documento ' + m.doc : ''}.${pre.numero ? ` Tengo la autorización N.° ${pre.numero}.` : ''} ¿Qué fechas tienen disponibles?`;
+}
+function channelsHTML(m, que, pre) {
+  const e = epsOf(m);
+  if (!m) return '';
+  if (!e) return `<div class="card"><b>${m.eps ? `Aún no tenemos los canales de ${esc(m.eps)}` : `${esc(first(m))} no tiene EPS registrada`}</b><span class="small muted">Llama a la línea que aparece en el carné o en la página de su EPS.${m.eps ? '' : ' Agrégala en Familia para ver sus canales aquí.'}</span><a class="btn sm" href="${ADRES_URL}" target="_blank" rel="noopener">Consultar EPS en ADRES</a></div>`;
+  const msg = scriptFor(m, que, pre);
+  const tels = Array.isArray(e.tels) ? e.tels : (e.tels[m.regimen] || [...e.tels.contributivo, ...e.tels.subsidiado.map(([a, b]) => [a + ' (subsidiado)', b])]);
+  const link = (lbl, url, cls = '', id = '') => `<a class="btn ${cls}" ${id ? `id="${id}" data-wa="${e.wa}"` : ''} href="${esc(url)}" target="_blank" rel="noopener" data-ch="${esc(lbl)}">${lbl.toLowerCase().includes('app') ? ic('share') : ic('send')} ${esc(lbl)}</a>`;
+  return `<div class="card" style="gap:10px"><div class="row"><b class="grow">Pedir a ${esc(e.n)}</b><span class="small muted">Verificado ${EPS_VERIFIED}</span></div>
+    <div class="actions" style="margin:0">${e.web ? link(e.web[0], e.web[1], 'primary') : ''}${e.wa ? link(`WhatsApp${e.waName ? ' (' + e.waName + ')' : ''}`, `https://wa.me/${e.wa}?text=${encodeURIComponent(msg)}`, '', 'pd-wa') : ''}${e.app ? link(e.app[0], e.app[1]) : ''}${e.app2 ? link(e.app2[0], e.app2[1]) : ''}${e.extra ? link(e.extra[0], e.extra[1], 'ghost') : ''}</div>
+    ${tels.length ? `<div class="checklist">${tels.map(([lbl, n]) => `<div class="row telrow"><span class="num"><span class="small muted">${esc(lbl)}</span><br><span class="mono">${esc(fmtTel(n))}</span></span><span class="chips"><a class="btn sm" href="tel:${encodeURIComponent(n)}" data-ch="Teléfono">Llamar</a><button class="btn sm" data-copy="${esc(n)}">Copiar</button></span></div>`).join('')}</div>` : ''}
+    ${e.wa && !e.waCitas ? '<span class="small muted">El WhatsApp de esta EPS atiende varios trámites; si no asigna citas, te dice por dónde pedirla.</span>' : ''}
+    ${e.more ? `<a class="btn ghost sm" href="${esc(e.more)}" target="_blank" rel="noopener">Ver todos los canales de ${esc(e.n)}</a>` : ''}</div>`;
+}
+function openPedir(pre = {}) {
+  if (!S.miembros.length) { openMember(); return; }
+  let mid = pre.miembroId || (filter !== 'todos' ? filter : S.miembros[0].id), lastCh = '';
+  const draw = () => {
+    const m = member(mid); const que = $('#pd-que')?.value ?? (pre.que || pre.especialidad || '');
+    openDialog(`${head('Pedir una cita')}
+      <div class="fields"><label class="f">¿Para quién?<select id="pd-m">${memberOptions(mid)}</select></label><label class="f">¿Qué cita?<input id="pd-que" value="${esc(que)}" placeholder="Ej.: Medicina general"></label></div>
+      ${channelsHTML(m, que, pre)}
+      <div class="answer" style="margin:0"><b style="color:var(--ai)">Qué decir</b><p id="pd-script">${esc(scriptFor(m, que, pre))}</p><div class="row"><span class="small muted grow">Ten a mano el documento${pre.numero ? ' y la autorización' : ''}.</span><button class="btn sm" id="pd-copy">${ic('copy')} Copiar</button></div></div>
+      <div class="dlg-foot"><button class="btn" id="pd-wait">Quedó pendiente</button><button class="btn primary" id="pd-got">${ic('check')} Ya me dieron la cita</button></div>`, r => {
+      r.querySelector('#pd-m').onchange = e => { mid = e.target.value; draw(); };
+      r.querySelector('#pd-que').oninput = e => { const t = scriptFor(member(mid), e.target.value.trim(), pre); r.querySelector('#pd-script').textContent = t; const wa = r.querySelector('#pd-wa'); if (wa) wa.href = `https://wa.me/${wa.dataset.wa}?text=${encodeURIComponent(t)}`; };
+      r.querySelectorAll('[data-ch]').forEach(a => a.addEventListener('click', () => { lastCh = a.dataset.ch; }));
+      r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
+      r.querySelector('#pd-copy').onclick = () => copyText(r.querySelector('#pd-script').textContent);
+      r.querySelector('#pd-got').onclick = () => openCitaForm({ miembroId: mid, especialidad: val(r, 'pd-que') || pre.especialidad || '', controlId: pre.controlId, autId: pre.autId, fecha: addDays(todayISO(), 1) });
+      r.querySelector('#pd-wait').onclick = () => {
+        S.sols.push({ id: uid(), miembroId: mid, que: val(r, 'pd-que') || 'Cita', canal: lastCh || 'teléfono', fecha: todayISO(), estado: 'esperando', radicado: '', controlId: pre.controlId || null, autId: pre.autId || null });
+        persist(); dlg.close(); view = 'salud'; salud = 'tramites'; render(); toast('Anotado en Trámites. Te avisamos si pasan 5 días.');
+      };
+    });
+  };
+  draw();
+}
+async function copyText(t) { try { await navigator.clipboard.writeText(t); toast('Copiado'); } catch (_) { toast('Mantén presionado el texto para copiarlo'); } }
+
+function openSol(id) {
+  const x = S.sols.find(y => y.id === id); if (!x) return; const m = member(x.miembroId); const n = -daysUntil(x.fecha);
+  openDialog(`${head(x.que)}
+    <dl class="facts"><dt>Para</dt><dd>${esc(m?.nombre || '—')}</dd><dt>Pedida</dt><dd>${esc(fmtLong(x.fecha))} (${relDays(-n)}) por ${esc(x.canal)}</dd><dt>Estado</dt><dd>${x.estado === 'esperando' ? 'Esperando respuesta' : 'Resuelta'}</dd></dl>
+    <label class="f">Número de radicado o solicitud<input id="sl-rad" value="${esc(x.radicado || '')}" placeholder="Si te dieron uno, anótalo"></label>
+    ${x.estado === 'esperando' ? `<div class="actions"><button class="btn sm" id="sl-again">Volver a pedirla</button><button class="btn sm" id="sl-help">No me responden: qué hago</button></div>` : ''}
+    <div class="dlg-foot"><button class="btn ghost danger" id="sl-del">Eliminar</button><button class="btn" id="sl-save">Guardar</button>${x.estado === 'esperando' ? `<button class="btn primary" id="sl-got">${ic('check')} Ya me la dieron</button>` : ''}</div>`, r => {
+    const saveRad = () => { x.radicado = val(r, 'sl-rad'); persist(); };
+    r.querySelector('#sl-save').onclick = () => { saveRad(); dlg.close(); render(); toast('Guardado'); };
+    r.querySelector('#sl-del').onclick = () => { dlg.close(); removeWithUndo('sols', x.id, 'Trámite eliminado'); };
+    r.querySelector('#sl-again')?.addEventListener('click', () => { saveRad(); openPedir({ miembroId: x.miembroId, que: x.que, controlId: x.controlId, autId: x.autId }); });
+    r.querySelector('#sl-help')?.addEventListener('click', () => { saveRad(); openReclamo(x.id); });
+    r.querySelector('#sl-got')?.addEventListener('click', () => { saveRad(); x.estado = 'resuelta'; persist(); render(); openCitaForm({ miembroId: x.miembroId, especialidad: x.que, controlId: x.controlId, autId: x.autId }); });
+  });
+}
+
+function openReclamo(id) {
+  const x = S.sols.find(y => y.id === id); if (!x) return; const m = member(x.miembroId); const e = epsOf(m); const n = -daysUntil(x.fecha);
+  const carta = `Señores ${e ? e.n : (m?.eps || 'EPS')}:\nEl ${fmtLong(x.fecha)} solicité una cita de ${x.que} para ${m?.nombre || ''}${m?.doc ? ', documento ' + m.doc : ''}, por ${x.canal}${x.radicado ? ', con radicado N.° ' + x.radicado : ''}. Han pasado ${n} días y no he recibido respuesta.\nSolicito que se asigne la cita lo antes posible y que me informen la fecha por este medio.\nGracias.`;
+  openDialog(`${head('No te dan la cita: qué hacer')}
+    <ol style="margin:0;padding-left:1.2em;display:grid;gap:10px">
+      <li><b>Insiste por otro canal de la EPS.</b> Si llamaste, prueba la web o el WhatsApp, y al revés. <button class="btn ghost sm" id="rc-ch">Ver canales</button></li>
+      <li><b>Pon una queja (PQRD) ante la EPS.</b> Usa el texto de abajo y guarda el número de radicado que te den.</li>
+      <li><b>Si la EPS no responde, acude a la Superintendencia de Salud</b>, que vigila a las EPS. <a href="${SUPERSALUD_URL}" target="_blank" rel="noopener">supersalud.gov.co</a></li>
+      <li><b>Si la demora pone en riesgo la salud o la vida</b>, puedes presentar una acción de tutela. No necesitas abogado.</li>
+    </ol>
+    <div class="answer" style="margin:0"><b style="color:var(--ai)">Texto para la queja</b><p id="rc-txt">${esc(carta)}</p><div class="row"><span></span><button class="btn sm" id="rc-copy">${ic('copy')} Copiar</button></div></div>
+    <p class="small muted" style="margin:0">Esto es una guía general, no asesoría legal.</p>`, r => {
+    r.querySelector('#rc-ch').onclick = () => openPedir({ miembroId: x.miembroId, que: x.que });
+    r.querySelector('#rc-copy').onclick = () => copyText(carta);
+  });
+}
+
+// ---------- share the week ----------
+function shareWeek() {
+  const up = upcoming().filter(c => daysUntil(c.fecha) <= 7);
+  const txt = up.length ? `Citas de la familia, próximos 7 días:\n` + up.map(c => `• ${fmtLong(c.fecha)}, ${fmtHora(c.hora)}: ${citaTitle(c)} de ${first(member(c.miembroId))}${c.lugar ? ' en ' + c.lugar : ''}${c.acompana ? ' (acompaña ' + c.acompana + ')' : ''}`).join('\n') : 'No tenemos citas en los próximos 7 días.';
+  openDialog(`${head('Enviar la semana a la familia')}<div class="answer" style="margin:0"><p>${esc(txt)}</p></div>
+    <div class="dlg-foot"><button class="btn" id="wk-copy">${ic('copy')} Copiar</button><a class="btn primary" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">${ic('share')} Enviar por WhatsApp</a></div>`, r => { r.querySelector('#wk-copy').onclick = () => copyText(txt); });
+}
+
+// ---------- settings ----------
+function openInstall() {
+  openDialog(`${head('Tenerla como app en tu celular')}
+    <div class="card"><b>iPhone (Safari)</b><span class="small">1. Abre Familia al Día en Safari.<br>2. Toca el botón Compartir (el cuadro con la flecha hacia arriba).<br>3. Elige “Agregar a inicio” y toca “Agregar”.</span></div>
+    <div class="card"><b>Android (Chrome)</b><span class="small">1. Abre Familia al Día en Chrome.<br>2. Toca el menú ⋮ arriba a la derecha.<br>3. Elige “Instalar app” o “Agregar a la pantalla principal”.</span></div>
+    <p class="small muted" style="margin:0">Queda un ícono como el de cualquier app y se abre a pantalla completa.</p>`);
+}
+async function exportData() {
+  const data = JSON.stringify(Object.assign({ app: 'familia-al-dia', exportado: new Date().toISOString() }, S), null, 2);
+  const filename = `familia-al-dia-copia-${todayISO()}.json`;
+  if (downloadsApi) { try { await downloadsApi.save({ filename, data }); toast('Copia guardada'); } catch (e) { if (!e || e.code !== 'declined') toast('No se pudo guardar la copia'); } return; }
+  try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast('Copia descargada'); } catch (_) { toast('No se pudo descargar'); }
+}
+function importData(file) {
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    let d; try { d = JSON.parse(fr.result); } catch (_) { toast('Ese archivo no es una copia válida'); return; }
+    if (!d || !Array.isArray(d.miembros) || !Array.isArray(d.citas)) { toast('Ese archivo no es una copia de Familia al Día'); return; }
+    openConfirm('¿Recuperar esta copia?', `Tiene ${d.miembros.length} personas y ${d.citas.length} citas. Reemplaza lo que hay ahora en la app.`, 'Recuperar', () => {
+      delete d.app; delete d.exportado; S = Object.assign(emptyState(), d); if (!S.consent) S.consent = { at: new Date().toISOString(), version: 'v1' }; persist(); view = 'inicio'; render(); toast('Copia recuperada');
+    });
+  };
+  fr.readAsText(file);
+}
+function openPrivacy() {
+  const where = mode === 'netlify' ? 'en servidores de Netlify, Inc. (proveedor de alojamiento en Estados Unidos), separados por cuenta; solo tú puedes verlos entrando con tu correo y contraseña, y la conexión es cifrada (HTTPS)' : mode === 'cloud' ? 'en tu cuenta, en un espacio privado que solo tú puedes ver' : 'solo en este celular o computador; no se envían a ningún servidor';
+  openDialog(`${head('Política de tratamiento de datos')}
+    <div style="display:grid;gap:10px;font-size:.9375rem">
+      <p style="margin:0"><b>Responsable:</b> ${esc(RESPONSABLE.nombre)} · ${esc(RESPONSABLE.correo)}</p>
+      <p style="margin:0"><b>Qué guardamos:</b> nombres, documento, EPS, citas, órdenes, controles, medicamentos y trámites que tú registras. Incluye datos de salud, que la Ley 1581 de 2012 considera sensibles.</p>
+      <p style="margin:0"><b>Para qué:</b> solo para organizar las citas de tu familia y mostrarte avisos. No vendemos ni compartimos tus datos.</p>
+      <p style="margin:0"><b>Dónde se guardan:</b> ${where}.</p>
+      ${aiOn() ? '<p style="margin:0"><b>Asistente y fotos:</b> cuando usas el asistente o lees una foto, ese texto o imagen y los datos necesarios de tu agenda se envían a un modelo de inteligencia artificial (Anthropic, a través de Netlify) solo para darte la respuesta.</p>' : ''}
+      ${mode === 'netlify' ? '<p style="margin:0"><a href="/privacidad.html" target="_blank" rel="noopener">Leer la política completa</a></p>' : ''}
+      <p style="margin:0"><b>Tus derechos:</b> conocer, actualizar, corregir y borrar tus datos en cualquier momento, y revocar tu autorización. Puedes borrar todo desde Ajustes.</p>
+      <p style="margin:0"><b>Datos de otras personas:</b> si registras a familiares adultos, debes contar con su autorización. Los datos de menores los registra su representante legal, en su interés.</p>
+      <p class="small muted" style="margin:0">Autorización aceptada el ${S.consent ? esc(new Date(S.consent.at).toLocaleDateString('es-CO')) : '—'}.</p>
+    </div>`);
+}
+
+let toastT = null;
+function toast(msg, undo) {
+  const t = $('#toast'), a = $('#toastAct'); $('#toastMsg').textContent = msg; t.hidden = false;
+  a.hidden = !undo; a.onclick = undo ? () => { t.hidden = true; undo(); } : null;
+  clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, undo ? 6000 : 2600);
+}
+
+boot();
+if (!window.claude && 'serviceWorker' in navigator && location.protocol === 'https:') { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (_) {} }
+})();
+</script>
+
+</body>
+</html>
