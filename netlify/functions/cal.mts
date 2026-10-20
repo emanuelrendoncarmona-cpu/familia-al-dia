@@ -2,7 +2,7 @@
 import type { Config, Context } from "@netlify/functions";
 import { stores } from "../../lib/common.mts";
 
-const esc = (s: string) => String(s || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\;");
+const esc = (s: string) => String(s || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;").replace(/\r/g, "");
 const fold = (line: string) => { const out: string[] = []; let l = line; while (l.length > 74) { out.push(l.slice(0, 74)); l = " " + l.slice(74); } out.push(l); return out.join("\r\n"); };
 const dt = (fecha: string, hora: string) => `${fecha.replace(/-/g, "")}T${(hora || "08:00").replace(":", "")}00`;
 const addMin = (fecha: string, hora: string, min: number) => { const [y, m, d] = fecha.split("-").map(Number); const [H, M] = (hora || "08:00").split(":").map(Number); const t = new Date(Date.UTC(y, m - 1, d, H, M + min)); const p = (n: number) => String(n).padStart(2, "0"); return `${t.getUTCFullYear()}${p(t.getUTCMonth() + 1)}${p(t.getUTCDate())}T${p(t.getUTCHours())}${p(t.getUTCMinutes())}00`; };
@@ -15,6 +15,10 @@ export default async (req: Request, context: Context) => {
   const ref = (await stores.calTokens().get(token, { type: "json" })) as { userId: string } | null;
   if (!ref) return new Response("No encontrado", { status: 404 });
   const a: any = (await stores.agendas().get(ref.userId, { type: "json" })) || { miembros: [], citas: [], auts: [], controles: [] };
+  // La familia de ejemplo nunca se publica en el calendario real.
+  if (a.ejemplo) { a.citas = []; a.auts = []; a.controles = []; }
+  const hoy = new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
+  const futuro = (f: string) => f >= hoy;
   const who = (id: string) => (a.miembros || []).find((m: any) => m.id === id)?.nombre || "";
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
   const L: string[] = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Emnova//Familia al Dia//ES", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Familia al Día", "X-WR-TIMEZONE:America/Bogota", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H",
@@ -26,11 +30,11 @@ export default async (req: Request, context: Context) => {
     L.push("BEGIN:VEVENT", `UID:cita-${c.id}@familiaaldia`, `DTSTAMP:${stamp}`, `DTSTART;TZID=America/Bogota:${dt(c.fecha, c.hora)}`, `DTEND;TZID=America/Bogota:${addMin(c.fecha, c.hora, 60)}`, fold(`SUMMARY:${esc(title)}`));
     if (c.lugar) L.push(fold(`LOCATION:${esc(c.lugar)}`));
     if (desc) L.push(fold(`DESCRIPTION:${esc(desc)}`));
-    if (["asistida", "perdida"].includes(c.estado)) L.push("STATUS:CONFIRMED");
-    L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Mañana tienes cita", "TRIGGER:-P1D", "END:VALARM", "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Cita en 2 horas", "TRIGGER:-PT2H", "END:VALARM", "END:VEVENT");
+    if (futuro(c.fecha) && !["asistida", "perdida"].includes(c.estado)) L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Mañana tienes cita", "TRIGGER:-P1D", "END:VALARM", "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Cita en 2 horas", "TRIGGER:-PT2H", "END:VALARM");
+    L.push("END:VEVENT");
   }
   for (const x of a.auts || []) {
-    if (!x.vence || x.estado === "usada") continue;
+    if (!x.vence || x.estado === "usada" || !futuro(x.vence)) continue;
     L.push("BEGIN:VEVENT", `UID:aut-${x.id}@familiaaldia`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${x.vence.replace(/-/g, "")}`, `DTEND;VALUE=DATE:${nextDay(x.vence)}`, fold(`SUMMARY:${esc(`Vence autorización: ${x.servicio} · ${who(x.miembroId)}`)}`), "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Autorización por vencer", "TRIGGER:-P7D", "END:VALARM", "END:VEVENT");
   }
   for (const k of a.controles || []) {
