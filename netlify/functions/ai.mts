@@ -111,7 +111,7 @@ Prioriza: (1) clínicas, IPS y consultorios con sitio oficial o perfil en direct
 REGLAS: solo incluye datos que aparezcan en los resultados de búsqueda; nunca inventes precios, teléfonos ni calificaciones (usa null si no aparecen). Los precios cambian: dilo tal como aparece y con su fuente.
 Responde SOLO con JSON: {"opciones":[{"nombre":string,"tipo":"medico"|"clinica"|"telemedicina","especialidad":string,"direccion":string|null,"ciudad":string|null,"telefono":string|null,"precio":string|null,"calificacion":string|null,"como_agendar":string|null,"url":string,"fuente":string}], "consejos":[string, string]} con máximo 6 opciones ordenadas de la mejor a la menos recomendada.`;
       try {
-        const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 2500, system, messages: [{ role: "user", content: `Busca opciones particulares de ${esp} en ${ciudad}.` }], tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5, user_location: { type: "approximate", country: "CO", ...(ciudad ? { city: ciudad } : {}) } } as any] } as any);
+        const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 2500, system, messages: [{ role: "user", content: `Busca opciones particulares de ${esp} en ${ciudad}.` }], tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 } as any] } as any);
         const text = msg.content.map((b: any) => (b.type === "text" ? b.text : "")).join("");
         const out = parseJSON(text);
         out.opciones = (Array.isArray(out.opciones) ? out.opciones : []).filter((o: any) => o && o.nombre && /^https?:\/\//.test(String(o.url || ""))).slice(0, 6);

@@ -25,6 +25,11 @@ export default async (req: Request) => {
     else if (body.accion === "anio") c.pagoHasta = new Date(base.getFullYear() + 1, base.getMonth(), base.getDate(), 23, 59).toISOString();
     else if (body.accion === "prueba7") c.trialHasta = new Date(Math.max(Date.now(), Date.parse(c.trialHasta)) + 7 * 864e5).toISOString();
     else if (body.accion === "quitar") c.pagoHasta = null;
+    else if (body.accion === "restaurar") {
+      const ok = (v: unknown) => v === null || (typeof v === "string" && !Number.isNaN(Date.parse(v)));
+      if (!ok(body.pagoHasta) || typeof body.trialHasta !== "string" || !ok(body.trialHasta)) return json({ error: "Datos inválidos." }, 400);
+      c.pagoHasta = body.pagoHasta; c.trialHasta = body.trialHasta;
+    }
     else return json({ error: "Acción desconocida." }, 400);
     if (typeof body.notas === "string") c.notas = body.notas.slice(0, 300);
     await s.setJSON(c.userId, c);
