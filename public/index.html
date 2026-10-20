@@ -353,7 +353,8 @@ let famInfo = null, rol = 'admin', baseSnap = null, invitacion = null;
 let netlifyId = null, idSettings = null, authUser = null, acct = null, isAdminUser = false, pendingSync = false, recoveryPending = false, authNotice = '', lastFetch = 0;
 const IDENTITY_URL = 'https://cdn.jsdelivr.net/npm/@netlify/identity@2.0.0/+esm';
 // Planes y forma de pago. Pega aquí tus links de Wompi o Mercado Pago y tu WhatsApp de ventas (solo números, con 57).
-const PAGO = { mensual: '$9.900 COP al mes', anual: '$99.000 COP al año', linkMensual: '', linkAnual: '', whatsapp: '', correo: 'emanuelrendoncarmona@gmail.com' };
+const PAGO = { mensual: '$9.900 COP al mes', anual: '$99.000 COP al año', montoMensual: '9900', montoAnual: '99000', llave: '3215611475', titular: 'Emnova', qr: '', linkMensual: '', linkAnual: '', whatsapp: '', correo: 'emanuelrendoncarmona@gmail.com' };
+const DEMO_MSG = 'Estás viendo la familia de ejemplo: no hay datos tuyos para exportar. Toca “Empezar con la mía” para agregar tu familia.';
 const aiOn = () => !!sampleApi || mode === 'netlify';
 const photoOn = () => sampleImages || mode === 'netlify';
 const lsKey = () => authUser ? LS_KEY + ':' + authUser.id : LS_KEY;
@@ -1221,25 +1222,34 @@ document.addEventListener('click', e => { if (e.target.closest('[data-copy-mail]
 // ---------- plan, calendario, exportar, admin ----------
 function openPlan() {
   const est = acct ? (acct.plan === 'pago' ? `Tu plan está activo hasta el ${fmtLong(String(acct.hasta).slice(0, 10))}.` : acct.plan === 'prueba' ? `Estás en la prueba gratis: te quedan ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}.` : 'Tu prueba gratis terminó.') : '';
-  const msg = `Hola, quiero activar Familia al Día. Mi correo de cuenta es ${acct ? acct.email : ''}. Adjunto el comprobante de pago.`;
+  const email = acct && acct.email ? acct.email : (authUser && authUser.email) || '';
+  const msg = `Hola, ya pagué Familia al Día. Mi correo de cuenta es ${email}. Adjunto el comprobante.`;
+  const mail = `mailto:${PAGO.correo}?subject=${encodeURIComponent('Activar plan Familia al Día')}&body=${encodeURIComponent(msg)}`;
   openDialog(`${head('Tu plan')}
     <p style="margin:0">${esc(est)}</p>
-    <div class="feat" style="grid-template-columns:1fr 1fr"><div><b>Mensual</b><span>${esc(PAGO.mensual)}</span></div><div><b>Anual</b><span>${esc(PAGO.anual)}</span><span class="small muted">Ahorras 2 meses</span></div></div>
-    <span class="small">Incluye: personas ilimitadas, asistente con IA, lectura de fotos, calendario conectado, avisos y canales de todas las EPS.</span>
-    <ol style="margin:0;padding-left:1.2em;display:grid;gap:6px">
-      <li>Paga con ${PAGO.linkMensual || PAGO.linkAnual ? 'uno de estos links' : 'el link que te enviamos por correo o WhatsApp'}.</li>
-      <li>Envíanos el comprobante con el correo de tu cuenta.</li>
-      <li>Activamos tu plan en menos de 24 horas hábiles.</li>
-    </ol>
-    <div class="actions">${PAGO.linkMensual ? `<a class="btn primary" href="${esc(PAGO.linkMensual)}" target="_blank" rel="noopener">Pagar mensual</a>` : ''}${PAGO.linkAnual ? `<a class="btn ${PAGO.linkMensual ? '' : 'primary'}" href="${esc(PAGO.linkAnual)}" target="_blank" rel="noopener">Pagar anual</a>` : ''}
-      ${PAGO.whatsapp ? `<a class="btn" href="https://wa.me/${PAGO.whatsapp}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('share')} Enviar comprobante</a>` : ''}
-      <button class="btn" id="pl-mail">${ic('copy')} Copiar correo de pagos</button></div>
-    <p class="small muted" style="margin:0">Escribe a <span class="mono">${esc(PAGO.correo)}</span> con el asunto “Activar plan”.</p>`, r => { r.querySelector('#pl-mail').onclick = () => copyText(PAGO.correo); });
+    <div class="feat" style="grid-template-columns:1fr 1fr"><div><b>Mensual</b><span>${esc(PAGO.mensual)}</span><button class="btn sm" data-copy="${PAGO.montoMensual}">${ic('copy')} Copiar monto</button></div><div><b>Anual</b><span>${esc(PAGO.anual)}</span><span class="small muted">Ahorras 2 meses</span><button class="btn sm" data-copy="${PAGO.montoAnual}">${ic('copy')} Copiar monto</button></div></div>
+    <span class="small">Incluye: personas ilimitadas, acceso para cada integrante con su correo, asistente con IA, lectura de fotos, búsqueda de citas particulares, calendario conectado y canales de todas las EPS.</span>
+    ${PAGO.llave ? `<div class="card" style="gap:10px;border-color:var(--accent)">
+      <b>Paga con Nequi o desde cualquier banco (Bre-B)</b>
+      ${PAGO.qr ? `<img src="${esc(PAGO.qr)}" alt="Código QR para pagar a ${esc(PAGO.titular)}" style="width:min(240px,100%);justify-self:center;border-radius:12px;background:#fff;padding:8px">` : ''}
+      <div class="row"><span class="grow"><span class="small muted">Llave</span><br><b class="mono" style="font-size:1.25rem">${esc(PAGO.llave)}</b></span><button class="btn sm primary" data-copy="${esc(PAGO.llave)}">${ic('copy')} Copiar llave</button></div>
+      <ol style="margin:0;padding-left:1.2em;display:grid;gap:6px" class="small">
+        <li>Abre Nequi o la app de tu banco y elige <b>Enviar plata</b> ${PAGO.qr ? 'o escanea el código' : ''} a la llave <b>${esc(PAGO.llave)}</b>.</li>
+        <li>Pon el monto: <b>$9.900</b> (mensual) o <b>$99.000</b> (anual).</li>
+        <li>En el mensaje o descripción escribe tu correo${email ? `: <b style="overflow-wrap:anywhere">${esc(email)}</b>` : ''}.</li>
+        <li>Envía el comprobante. Activamos tu plan en menos de 24 horas hábiles.</li>
+      </ol>
+      <div class="chips">${email ? `<button class="btn sm" data-copy="${esc(email)}">${ic('copy')} Copiar mi correo</button>` : ''}${PAGO.whatsapp ? `<a class="btn sm" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('share')} Comprobante por WhatsApp</a>` : ''}<a class="btn sm" href="${esc(mail)}">Comprobante por correo</a></div>
+      <span class="small muted">Verifica que el nombre que aparece al enviar sea el titular de la llave antes de confirmar.</span>
+    </div>` : ''}
+    ${PAGO.linkMensual || PAGO.linkAnual ? `<div class="actions">${PAGO.linkMensual ? `<a class="btn primary" href="${esc(PAGO.linkMensual)}" target="_blank" rel="noopener">Pagar mensual con tarjeta</a>` : ''}${PAGO.linkAnual ? `<a class="btn" href="${esc(PAGO.linkAnual)}" target="_blank" rel="noopener">Pagar anual con tarjeta</a>` : ''}</div>` : ''}
+    <p class="small muted" style="margin:0">¿Dudas con el pago? Escribe a <span class="mono">${esc(PAGO.correo)}</span>.</p>`, r => { r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy)); });
 }
 function openCalendar() {
   if (!acct || !acct.calUrl) { toast('Entra con tu cuenta para conectar el calendario'); return; }
   const url = acct.calUrl, webcal = url.replace(/^https?:/, 'webcal:');
   openDialog(`${head('Conectar mi calendario')}
+    ${S.ejemplo ? '<div class="notice" style="margin:0"><span>La familia de ejemplo no aparece en tu calendario. Cuando agregues tu familia, sus citas aparecen solas.</span></div>' : ''}
     <p style="margin:0">Copia este enlace privado y agrégalo una sola vez. Después tus citas, controles y vencimientos aparecen solos.</p>
     <div class="answer" style="margin:0"><span class="mono small" style="overflow-wrap:anywhere">${esc(url)}</span><div class="row"><span></span><button class="btn sm primary" id="cl-copy">${ic('copy')} Copiar enlace</button></div></div>
     <div class="card"><b>Google Calendar</b><span class="small">1. En un computador, abre calendar.google.com.<br>2. A la izquierda, junto a “Otros calendarios”, toca <b>+</b> y elige <b>Desde URL</b>.<br>3. Pega el enlace y toca <b>Agregar calendario</b>.<br>4. En la configuración de “Familia al Día”, activa las notificaciones.<br>Se ve en el celular con la app de Google Calendar. Google puede tardar varias horas en mostrar los cambios.</span><a class="btn sm" href="https://calendar.google.com/calendar/u/0/r/settings/addbyurl" target="_blank" rel="noopener">Abrir Google Calendar</a></div>
@@ -1247,6 +1257,8 @@ function openCalendar() {
     <p class="small muted" style="margin:0">Es un enlace privado: no lo publiques. Quien lo tenga puede ver tus citas.</p>`, r => { r.querySelector('#cl-copy').onclick = () => copyText(url); });
 }
 async function exportCSV() {
+  if (S.ejemplo) { toast(DEMO_MSG); return; }
+  if (!S.citas.length) { toast('Aún no tienes citas para exportar.'); return; }
   const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rows = [['Persona', 'Tipo', 'Especialidad', 'Fecha', 'Hora', 'Lugar', 'Profesional', 'Acompaña', 'Estado', 'Qué llevar', 'Notas']].concat([...S.citas].sort(sortCitas).map(c => [member(c.miembroId)?.nombre || '', TIPOS[c.tipo]?.label || '', c.especialidad || '', c.fecha, c.hora || '', c.lugar || '', c.profesional || '', c.acompana || '', ESTADOS[c.estado] || c.estado, (c.req || []).map(r => r.t + (r.ok ? ' ✓' : '')).join('; '), c.notas || '']));
   const data = '﻿' + rows.map(r => r.map(q).join(',')).join('\r\n');
@@ -1585,6 +1597,7 @@ function openReclamo(id) {
 
 // ---------- share the week ----------
 function shareWeek() {
+  if (S.ejemplo) { toast(DEMO_MSG); return; }
   const up = upcoming().filter(c => daysUntil(c.fecha) <= 7);
   const txt = up.length ? `Citas de la familia, próximos 7 días:\n` + up.map(c => `• ${fmtLong(c.fecha)}, ${fmtHora(c.hora)}: ${citaTitle(c)} de ${first(member(c.miembroId))}${c.lugar ? ' en ' + c.lugar : ''}${c.acompana ? ' (acompaña ' + c.acompana + ')' : ''}`).join('\n') : 'No tenemos citas en los próximos 7 días.';
   openDialog(`${head('Enviar la semana a la familia')}<div class="answer" style="margin:0"><p>${esc(txt)}</p></div>
@@ -1599,6 +1612,8 @@ function openInstall() {
     <p class="small muted" style="margin:0">Queda un ícono como el de cualquier app y se abre a pantalla completa.</p>`);
 }
 async function exportData() {
+  if (S.ejemplo) { toast(DEMO_MSG); return; }
+  if (!S.miembros.length) { toast('Aún no hay datos para guardar.'); return; }
   const data = JSON.stringify(Object.assign({ app: 'familia-al-dia', exportado: new Date().toISOString() }, S), null, 2);
   const filename = `familia-al-dia-copia-${todayISO()}.json`;
   if (downloadsApi) { try { await downloadsApi.save({ filename, data }); toast('Copia guardada'); } catch (e) { if (!e || e.code !== 'declined') toast('No se pudo guardar la copia'); } return; }
