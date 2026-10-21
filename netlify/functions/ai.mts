@@ -21,6 +21,7 @@ Cómo funciona la app:
 - Privacidad: los datos se guardan cifrados en Netlify, solo tú los ves con tu cuenta. Responsable: Emnova (emanuelrendoncarmona@gmail.com).
 - Acceso familiar: en Familia > Quién tiene acceso, quien administra invita a cada integrante con su correo (puede editar o solo ver). La persona crea su cuenta con ese mismo correo y acepta la invitación. Todos ven la misma agenda.
 - Citas particulares: botón + > Buscar cita particular. Busca opciones con precio y calificaciones, y enlaces para verificar al médico en ReTHUS y a la clínica en REPS.
+- Recordatorios: en Familia > Ajustes > Recordatorios > Activar. Llega una notificación al celular 1 día antes y 1 hora antes de cada cita. Cada integrante los activa en su propio celular. En iPhone primero hay que instalar la app (Safari > Compartir > Agregar a inicio) y abrirla desde el ícono; necesita iOS 16.4 o más reciente.
 - Guías: en Salud > Guías hay pasos y derechos para: cita demorada, medicamentos pendientes, MIPRES, portabilidad, cambio de EPS, incapacidades, cirugía programada, tutela y verificar médicos.
 Si no sabes algo, dilo y sugiere escribir a emanuelrendoncarmona@gmail.com.`;
 

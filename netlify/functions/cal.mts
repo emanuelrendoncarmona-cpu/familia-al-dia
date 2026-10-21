@@ -30,7 +30,7 @@ export default async (req: Request, context: Context) => {
     L.push("BEGIN:VEVENT", `UID:cita-${c.id}@familiaaldia`, `DTSTAMP:${stamp}`, `DTSTART;TZID=America/Bogota:${dt(c.fecha, c.hora)}`, `DTEND;TZID=America/Bogota:${addMin(c.fecha, c.hora, 60)}`, fold(`SUMMARY:${esc(title)}`));
     if (c.lugar) L.push(fold(`LOCATION:${esc(c.lugar)}`));
     if (desc) L.push(fold(`DESCRIPTION:${esc(desc)}`));
-    if (futuro(c.fecha) && !["asistida", "perdida"].includes(c.estado)) L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Mañana tienes cita", "TRIGGER:-P1D", "END:VALARM", "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Cita en 2 horas", "TRIGGER:-PT2H", "END:VALARM");
+    if (futuro(c.fecha) && !["asistida", "perdida"].includes(c.estado)) L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Mañana tienes cita", "TRIGGER:-P1D", "END:VALARM", "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Cita en 1 hora", "TRIGGER:-PT1H", "END:VALARM");
     L.push("END:VEVENT");
   }
   for (const x of a.auts || []) {
