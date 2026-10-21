@@ -506,6 +506,7 @@ async function loadCloud() {
   if (!Array.isArray(S.opciones)) S.opciones = [];
   if (j.agenda) S.version = j.agenda.version || 0;
   setStatus(); render();
+  checkPush().then(() => { if (!dlg.open) render(); });
   if (!j.agenda && rol === 'admin') {
     const legacy = readLocal(LS_KEY);
     if (legacy && Array.isArray(legacy.miembros) && legacy.miembros.length && !legacy.ejemplo) {
@@ -691,7 +692,7 @@ function inicioHTML() {
       <div class="actions"><button class="btn primary" data-cita="${next.id}">${ic('check')} Alistar</button><a class="btn" href="${esc(gcalUrl(next))}" target="_blank" rel="noopener">${ic('google')} A mi calendario</a><a class="btn" href="${esc(waUrl(next))}" target="_blank" rel="noopener">${ic('share')} WhatsApp</a></div></div></div>`;
   } else hero = `<div class="empty" style="margin-top:14px"><b>No hay citas próximas</b><span class="muted small">Escribe arriba algo como “cita de odontología el lunes a las 9”, o pide una a tu EPS.</span><button class="btn primary" data-act="pedir">${ic('cal')} Pedir una cita</button></div>`;
   const qa = `<div class="qa"><button data-act="pedir">${ic('cal')}<b>Pedir cita a la EPS</b><small>Canales oficiales y qué decir</small></button><button class="hot" data-act="particular">${ic('spark')}<b>Cita particular</b><small>Opciones con precio y calificación</small></button></div>`;
-  return askHTML() + qa + hero + stripHTML() +
+  return askHTML() + pushBannerHTML() + qa + hero + stripHTML() +
     `<div class="sec"><div class="sec-head"><h2>Atención</h2>${al.length ? `<span class="badge ${al.some(a => a.lvl === 'crit') ? 'crit' : 'warn'}">${al.length} ${al.length === 1 ? 'aviso' : 'avisos'}</span>` : ''}</div>
     ${al.length ? al.slice(0, 6).map((a, i) => `<div class="alert ${a.lvl}"><span class="ic">${ic(a.k)}</span><div class="txt"><b>${esc(a.title)}</b><span class="small muted">${esc(a.sub)}</span></div><button class="btn sm" data-alert="${i}">${esc(a.act[0])}</button></div>`).join('') : `<div class="card"><b>Todo en orden</b><span class="small muted">No hay autorizaciones por vencer ni controles atrasados.</span></div>`}</div>
     ${up.length > 1 ? `<div class="sec"><div class="sec-head"><h2>Después</h2><button class="btn ghost sm" data-go2="agenda">Ver agenda completa</button></div>${up.slice(1, 4).map(citaCard).join('')}</div>` : ''}`;
@@ -775,6 +776,7 @@ function familiaHTML() {
   ${mode === 'netlify' && famInfo ? accessHTML() : ''}
   <div class="sec"><div class="sec-head"><h2>Ajustes</h2><button class="btn ghost sm" data-act="help">${ic('spark')} Ayuda y preguntas</button></div>
     ${mode === 'netlify' && acct ? `<div class="card"><div class="row"><span class="grow"><b>Tu cuenta</b><br><span class="small muted">${esc(acct.email || '')}</span><br><span class="badge ${acct.plan === 'pago' ? 'good' : acct.plan === 'prueba' ? 'accent' : 'crit'}">${acct.plan === 'pago' ? 'Plan activo hasta el ' + fmtDate(String(acct.hasta).slice(0, 10)) : acct.plan === 'prueba' ? `Prueba gratis · ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}` : 'Plan vencido'}</span></span><span class="chips"><button class="btn sm ${acct.plan === 'pago' ? '' : 'primary'}" data-act="plan">${acct.plan === 'pago' ? 'Mi plan' : 'Activar plan'}</button><button class="btn sm" data-act="logout">Cerrar sesión</button></span></div></div>
+    ${pushCardHTML()}
     <div class="card"><div class="row"><span class="grow"><b>Conectar mi calendario</b><br><span class="small muted">Tus citas aparecen solas en Google Calendar o en el iPhone.</span></span><button class="btn sm" data-act="calendar">Conectar</button></div></div>` : ''}
     <div class="card"><div class="row"><span class="grow"><b>Exportar a Google Sheets o Excel</b><br><span class="small muted">Descarga todas las citas en una tabla.</span></span><button class="btn sm" data-act="csv">Exportar citas</button></div></div>
     ${isAdminUser ? '<div class="card" style="border-color:var(--accent)"><div class="row"><span class="grow"><b>Administración</b><br><span class="small muted">Clientes, pruebas y activación de planes.</span></span><button class="btn sm primary" data-act="admin">Abrir panel</button></div></div>' : ''}
@@ -812,6 +814,7 @@ function bind(app) {
   $('#helpForm')?.addEventListener('submit', e => { e.preventDefault(); askHelp($('#helpIn').value.trim()); });
   app.querySelectorAll('[data-faq-go]').forEach(b => b.onclick = () => ({ familia: () => go('familia'), plus: () => openPlus(), calendar: () => (mode === 'netlify' ? openCalendar() : go('familia')), install: () => openInstall(), plan: () => openPlan() })[b.dataset.faqGo]?.());
   app.querySelectorAll('[data-act]').forEach(b => b.onclick = () => ({
+    'push-on': () => enablePush(), 'push-off': () => disablePush(), 'push-test': () => testPush(), 'push-later': () => { try { localStorage.setItem('fad-push-no', '1'); } catch (_) {} render(); },
     'add-member': () => openMember(), 'new-cita': () => openCitaForm(), 'plus': () => openPlus(), 'week': () => shareWeek(), 'invite': () => openInvite(), 'inv-si': () => famAction({ accion: 'aceptar' }, 'Te uniste a la familia'), 'inv-no': () => famAction({ accion: 'rechazar' }, 'Invitación rechazada'), 'leave': () => openConfirm('¿Salir de esta familia?', 'Dejarás de ver su agenda. Podrás volver si te invitan de nuevo.', 'Salir', () => famAction({ accion: 'salir' }, 'Saliste de la familia')), 'particular': () => openParticular(), 'guias': () => go('salud', 'guias'), 'help': () => go('ayuda'), 'plan': () => openPlan(), 'calendar': () => openCalendar(), 'csv': () => exportCSV(), 'admin': () => openAdmin(), 'logout': () => doLogout(), 'install': () => openInstall(), 'backup': () => exportData(), 'restore': () => $('#restoreIn').click(), 'privacy': () => openPrivacy(), 'wipe': () => openConfirm('¿Borrar todos tus datos?', 'Se eliminan todas las personas, citas, órdenes, controles, medicamentos y trámites. No se puede deshacer.', 'Borrar todo', async () => { if (mode === 'netlify') { try { await fetch('/api/data', { method: 'DELETE', credentials: 'same-origin' }); } catch (_) {} try { localStorage.removeItem(lsKey()); } catch (_) {} S = emptyState(); view = 'inicio'; render(); toast('Datos borrados de tu cuenta'); return; } S = emptyState(); persist(); view = 'inicio'; render(); toast('Datos borrados'); }), 'add-aut': () => openAut(), 'add-ctl': () => openCtl(), 'add-med': () => openMed(),
     'clear-day': () => { dayFilter = null; render(); }, 'pedir': () => openPedir({}), 'close-answer': () => { answer = null; render(); },
     'clear-demo': () => openConfirm('¿Borrar la familia de ejemplo?', 'Se eliminan los datos de ejemplo para que empieces con los tuyos.', 'Borrar ejemplo', () => { const c = S.consent; S = emptyState(); S.consent = c; persist(); view = 'familia'; render(); openMember(); }),
@@ -1487,6 +1490,62 @@ function openGuia(id) {
       persist(); dlg.close(); view = 'salud'; salud = 'tramites'; render(); toast('Trámite creado. Marca cada paso al hacerlo.');
     });
   });
+}
+
+// ---------- recordatorios (notificaciones push) ----------
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const pushCapable = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+let pushState = { checked: false, on: false, endpoint: '' };
+const b64uToBytes = s => { const p = '='.repeat((4 - s.length % 4) % 4); const raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(raw, ch => ch.charCodeAt(0)); };
+async function checkPush() {
+  if (mode !== 'netlify' || !pushCapable()) { pushState.checked = true; return pushState; }
+  try { const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription(); pushState = { checked: true, on: !!sub && Notification.permission === 'granted', endpoint: sub ? sub.endpoint : '' }; } catch (_) { pushState.checked = true; }
+  return pushState;
+}
+async function enablePush() {
+  if (!pushCapable()) { openPushHelp(); return false; }
+  if (isIOS() && !isStandalone()) { openPushHelp(); return false; }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast(perm === 'denied' ? 'Bloqueaste las notificaciones. Actívalas en los ajustes del celular para esta app.' : 'No se activaron los recordatorios.'); return false; }
+    const k = await fetch('/api/push', { credentials: 'same-origin' }).then(r => r.json());
+    if (!k.publicKey) { toast('Los recordatorios aún no están activos. Intenta más tarde.'); return false; }
+    const reg = await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(k.publicKey) });
+    const r = await fetch('/api/push', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accion: 'suscribir', sub: sub.toJSON() }) });
+    if (!r.ok) { const er = new Error((await r.json().catch(() => ({}))).error || 'No se pudieron activar los recordatorios.'); er.mine = true; throw er; }
+    pushState = { checked: true, on: true, endpoint: sub.endpoint };
+    toast('Recordatorios activados en este celular'); render(); return true;
+  } catch (e) { toast(e && e.mine ? e.message : 'No se pudieron activar en este navegador. Ábrela normal (no en modo incógnito) o instálala como app e intenta de nuevo.'); return false; }
+}
+async function disablePush() {
+  try { const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription();
+    if (sub) { await fetch('/api/push', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accion: 'quitar', endpoint: sub.endpoint }) }); await sub.unsubscribe(); }
+  } catch (_) {}
+  pushState = { checked: true, on: false, endpoint: '' }; toast('Recordatorios desactivados en este celular'); render();
+}
+async function testPush() {
+  try { const r = await fetch('/api/push', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accion: 'prueba', endpoint: pushState.endpoint }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error); toast('Prueba enviada. Debe llegarte en unos segundos.'); }
+  catch (e) { toast((e && e.message) || 'No se pudo enviar la prueba.'); if (/Actívalas/.test(String(e && e.message))) { pushState.on = false; render(); } }
+}
+function openPushHelp() {
+  openDialog(`${head('Recordatorios en tu celular')}
+    <p style="margin:0">Te avisamos <b>1 día antes</b> y <b>1 hora antes</b> de cada cita, a cada integrante que los active en su celular.</p>
+    ${isIOS() ? `<div class="card"><b>En iPhone, primero instala la app</b><span class="small">1. Abre Familia al Día en <b>Safari</b>.<br>2. Toca Compartir (el cuadro con la flecha) y elige <b>“Agregar a inicio”</b>.<br>3. Abre la app desde el ícono nuevo y toca <b>Activar recordatorios</b>.<br>Necesitas iOS 16.4 o más reciente.</span></div>` : `<div class="card"><b>Tu navegador no permite notificaciones</b><span class="small">Abre Familia al Día en Chrome (Android o computador) o instálala como app y vuelve a intentarlo.</span></div>`}
+    <p class="small muted" style="margin:0">También puedes conectar tu calendario: Google Calendar o el iPhone te avisan con sus propias alarmas.</p>`);
+}
+function pushCardHTML() {
+  if (mode !== 'netlify') return '';
+  const st = pushState.on ? '<span class="badge good">Activos en este celular</span>' : '';
+  return `<div class="card"><div class="row"><span class="grow"><b>Recordatorios</b> ${st}<br><span class="small muted">Notificación 1 día antes y 1 hora antes de cada cita. Cada integrante los activa en su celular.</span></span>${pushState.on ? '' : `<button class="btn sm primary" data-act="push-on">Activar</button>`}</div>${pushState.on ? `<span class="chips"><button class="btn sm" data-act="push-test">Enviar prueba</button><button class="btn sm ghost" data-act="push-off">Desactivar</button></span>` : ''}</div>`;
+}
+function pushBannerHTML() {
+  if (mode !== 'netlify' || !pushState.checked || pushState.on || !S.citas.some(ACTIVE)) return '';
+  try { if (localStorage.getItem('fad-push-no')) return ''; } catch (_) {}
+  if (pushCapable() && Notification.permission === 'denied') return '';
+  return `<div class="notice" style="margin-top:12px"><span>${ic('alert')} <b>¿Te avisamos antes de cada cita?</b> 1 día antes y 1 hora antes, en este celular.</span><span class="chips"><button class="btn sm primary" data-act="push-on">Activar</button><button class="btn sm ghost" data-act="push-later">Ahora no</button></span></div>`;
 }
 
 // ---------- quick add sheet ----------
