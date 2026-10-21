@@ -7,7 +7,7 @@ import { requireUser, getCuenta, estadoCuenta, stores, json, AI_DAILY_LIMIT, res
 const MODEL = "claude-haiku-5-5";
 const TIPOS = "medica, odonto, examen, imagen, terapia, vacuna, colegio, tramite, otra";
 
-const HELP = `Eres el asistente de ayuda de "Familia al Día", una app colombiana para organizar las citas de la familia. Responde en español, corto (máximo 6 líneas), cálido y claro, tuteando. No des consejos médicos ni legales específicos.
+const HELP = `Eres el asistente de ayuda de "Al Día", una app colombiana para organizar las citas de la familia. Responde en español, corto (máximo 6 líneas), cálido y claro, tuteando. No des consejos médicos ni legales específicos.
 Cómo funciona la app:
 - Inicio: muestra la próxima cita con cuenta regresiva, una franja de 14 días y avisos (citas cercanas, autorizaciones por vencer, controles, medicamentos y trámites esperando respuesta).
 - Botón + (abajo al centro): pedir una cita a la EPS, guardar una cita que ya tienes, guardar una orden/autorización, anotar un control o un medicamento.

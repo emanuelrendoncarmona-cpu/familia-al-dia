@@ -32,7 +32,7 @@ export default async (req: Request) => {
   if (body.accion === "prueba") {
     const sub = reg.subs.find(x => x.endpoint === String(body.endpoint || "")) || reg.subs[reg.subs.length - 1];
     if (!sub) return json({ error: "Este celular no tiene los recordatorios activados." }, 404);
-    const status = await sendPush(sub, { title: "Familia al Día", body: "¡Listo! Así te llegarán los recordatorios: 1 día antes y 1 hora antes de cada cita.", tag: "prueba", url: "/" }, { ttl: 600 });
+    const status = await sendPush(sub, { title: "Al Día", body: "¡Listo! Así te llegarán los recordatorios: 1 día antes y 1 hora antes de cada cita.", tag: "prueba", url: "/" }, { ttl: 600 });
     if (status === 404 || status === 410) { reg.subs = reg.subs.filter(x => x.endpoint !== sub.endpoint); await s.setJSON(user.id, reg); return json({ error: "Este celular dejó de aceptar notificaciones. Actívalas de nuevo." }, 410); }
     if (status >= 300) { console.error("[push prueba]", status); return json({ error: "No se pudo enviar la prueba. Intenta de nuevo." }, 502); }
     return json({ ok: true });
