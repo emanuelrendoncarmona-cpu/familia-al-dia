@@ -359,7 +359,15 @@ let famInfo = null, rol = 'admin', baseSnap = null, invitacion = null;
 let netlifyId = null, idSettings = null, authUser = null, acct = null, isAdminUser = false, pendingSync = false, recoveryPending = false, authNotice = '', lastFetch = 0;
 const IDENTITY_URL = 'https://cdn.jsdelivr.net/npm/@netlify/identity@2.0.0/+esm';
 // Planes y forma de pago. Pega aquí tus links de Wompi o Mercado Pago y tu WhatsApp de ventas (solo números, con 57).
-const PAGO = { mensual: '$9.900 COP al mes', anual: '$99.000 COP al año', montoMensual: '9900', montoAnual: '99000', llave: '0093101200', titular: 'Emnova Emanuel Rendon', qrMensual: 'pago-mensual.png', qrAnual: 'pago-anual.png', linkMensual: '', linkAnual: '', whatsapp: '', correo: 'emanuelrendoncarmona@gmail.com' };
+const PAGO = { llave: '0093101200', titular: 'Emnova Emanuel Rendon', linkMensual: '', linkAnual: '', whatsapp: '', correo: 'emanuelrendoncarmona@gmail.com' };
+// Planes: el precio cubre a toda la familia. "cupo" = personas que entran con su propio correo (personas en la familia: ilimitadas).
+const PLANES_UI = {
+  familiar: { nombre: 'Familiar', cupo: 4, mensual: 9900, anual: 99000, qrMensual: 'pago-mensual.png', qrAnual: 'pago-anual.png' },
+  plus: { nombre: 'Familiar Plus', cupo: 8, mensual: 14900, anual: 149000, qrMensual: '', qrAnual: '' },
+};
+const money = n => '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const cupoActual = () => (acct && acct.cupo) || 4;
+const usados = () => famInfo ? famInfo.miembros.length + famInfo.invitaciones.length : 1;
 const DEMO_MSG = 'Estás viendo la familia de ejemplo: no hay datos tuyos para exportar. Toca “Empezar con la mía” para agregar tu familia.';
 const aiOn = () => !!sampleApi || mode === 'netlify';
 const photoOn = () => sampleImages || mode === 'netlify';
@@ -667,12 +675,13 @@ function render() {
   if (!S.consent) { app.innerHTML = onboardHTML(); bindOnboard(); return; }
   $('#famName').textContent = S.familia.nombre ? 'Familia ' + S.familia.nombre : 'Agenda familiar';
   const demo = S.ejemplo && rol === 'admin' ? `<div class="notice"><span>Estás viendo una familia de ejemplo.</span><button class="btn sm" data-act="clear-demo">Empezar con la mía</button></div>` : '';
+  const borra = mode === 'netlify' && acct && acct.borraEl && !acct.activo ? `<div class="notice" style="background:var(--crit-soft)"><span><b>Tu información se borrará el ${esc(fmtLong(String(acct.borraEl).slice(0, 10)))}.</b> Tu plan lleva más de un año vencido. Renuévalo antes de esa fecha para conservarla, o descarga una copia.</span><span class="chips"><button class="btn sm primary" data-act="plan">Renovar</button><button class="btn sm" data-act="backup">Descargar copia</button></span></div>` : '';
   const pay = mode === 'netlify' && acct && !acct.activo ? `<div class="notice" style="background:var(--crit-soft)"><span><b>Tu prueba gratis terminó.</b> Puedes ver y exportar tus datos, pero los cambios no se guardan hasta activar tu plan.</span><button class="btn sm primary" data-act="plan">Activar plan</button></div>`
     : mode === 'netlify' && acct && acct.plan === 'prueba' && acct.dias <= 3 ? `<div class="notice"><span>Te quedan ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'} de prueba gratis.</span><button class="btn sm" data-act="plan">Ver planes</button></div>` : '';
   const roBanner = mode === 'netlify' && rol === 'lector' ? `<div class="notice"><span>Tienes acceso <b>solo para ver</b> la agenda de esta familia.</span></div>` : '';
   const invBanner = mode === 'netlify' && invitacion ? `<div class="notice" style="background:var(--ai-soft)"><span><b>${esc(invitacion.por)}</b> te invitó a la familia ${esc(invitacion.familia || '')}.</span><span class="chips"><button class="btn sm" data-act="inv-no">No, gracias</button><button class="btn sm primary" data-act="inv-si">Unirme</button></span></div>` : '';
   const body = view === 'inicio' ? inicioHTML() : view === 'agenda' ? agendaHTML() : view === 'salud' ? saludHTML() : view === 'ayuda' ? ayudaHTML() : familiaHTML();
-  app.innerHTML = demo + pay + roBanner + invBanner + body;
+  app.innerHTML = demo + borra + pay + roBanner + invBanner + body;
   bind(app);
 }
 
@@ -781,7 +790,7 @@ function familiaHTML() {
   }).join('') : `<div class="empty"><b>Aún no hay nadie</b><span class="muted small">Agrega a las personas cuyas citas organizas.</span></div>`}</div>
   ${mode === 'netlify' && famInfo ? accessHTML() : ''}
   <div class="sec"><div class="sec-head"><h2>Ajustes</h2><button class="btn ghost sm" data-act="help">${ic('spark')} Ayuda y preguntas</button></div>
-    ${mode === 'netlify' && acct ? `<div class="card"><div class="row"><span class="grow"><b>Tu cuenta</b><br><span class="small muted">${esc(acct.email || '')}</span><br><span class="badge ${acct.plan === 'pago' ? 'good' : acct.plan === 'prueba' ? 'accent' : 'crit'}">${acct.plan === 'pago' ? 'Plan activo hasta el ' + fmtDate(String(acct.hasta).slice(0, 10)) : acct.plan === 'prueba' ? `Prueba gratis · ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}` : 'Plan vencido'}</span></span><span class="chips"><button class="btn sm ${acct.plan === 'pago' ? '' : 'primary'}" data-act="plan">${acct.plan === 'pago' ? 'Mi plan' : 'Activar plan'}</button><button class="btn sm" data-act="logout">Cerrar sesión</button></span></div></div>
+    ${mode === 'netlify' && acct ? `<div class="card" style="gap:8px"><span><b>Tu cuenta</b><br><span class="small muted">${esc(acct.email || '')}</span><br><span class="badge ${acct.plan === 'pago' ? 'good' : acct.plan === 'prueba' ? 'accent' : 'crit'}">${acct.plan === 'pago' ? 'Plan activo hasta el ' + fmtDate(String(acct.hasta).slice(0, 10)) : acct.plan === 'prueba' ? `Prueba gratis · ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}` : 'Plan vencido'}</span><br><span class="small">Plan <b>${esc(acct.tipoNombre || 'Familiar')}</b> · hasta ${cupoActual()} personas con acceso</span></span><span class="chips"><button class="btn sm ${acct.plan === 'pago' ? '' : 'primary'}" data-act="plan">${acct.plan === 'pago' ? 'Ver planes' : 'Activar plan'}</button><button class="btn sm" data-act="logout">Cerrar sesión</button></span></div>
     ${pushCardHTML()}
     <div class="card"><div class="row"><span class="grow"><b>Conectar mi calendario</b><br><span class="small muted">Tus citas aparecen solas en Google Calendar o en el iPhone.</span></span><button class="btn sm" data-act="calendar">Conectar</button></div></div>` : ''}
     <div class="card"><div class="row"><span class="grow"><b>Exportar a Google Sheets o Excel</b><br><span class="small muted">Descarga todas las citas en una tabla.</span></span><button class="btn sm" data-act="csv">Exportar citas</button></div></div>
@@ -1231,36 +1240,51 @@ document.addEventListener('click', e => { if (e.target.closest('[data-copy-mail]
 
 // ---------- plan, calendario, exportar, admin ----------
 function openPlan() {
-  const est = acct ? (acct.plan === 'pago' ? `Tu plan está activo hasta el ${fmtLong(String(acct.hasta).slice(0, 10))}.` : acct.plan === 'prueba' ? `Estás en la prueba gratis: te quedan ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}.` : 'Tu prueba gratis terminó.') : '';
+  const tipoAct = acct && acct.tipo ? acct.tipo : 'familiar';
+  const est = acct ? (acct.plan === 'pago' ? `Tienes el plan ${acct.tipoNombre || 'Familiar'} activo hasta el ${fmtLong(String(acct.hasta).slice(0, 10))}.` : acct.plan === 'prueba' ? `Estás en la prueba gratis: te quedan ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}.` : 'Tu plan está vencido.') : '';
   const email = acct && acct.email ? acct.email : (authUser && authUser.email) || '';
-  const msg = `Hola, ya pagué FamiliSalud. Mi correo de cuenta es ${email}. Adjunto el comprobante.`;
-  const mail = `mailto:${PAGO.correo}?subject=${encodeURIComponent('Activar plan FamiliSalud')}&body=${encodeURIComponent(msg)}`;
+  let sel = { plan: PLANES_UI[tipoAct] ? tipoAct : 'familiar', per: 'mensual' };
+  const msgFor = () => `Hola, ya pagué FamiliSalud plan ${PLANES_UI[sel.plan].nombre} ${sel.per}. Mi correo de cuenta es ${email}. Adjunto el comprobante.`;
+  const mailFor = () => `mailto:${PAGO.correo}?subject=${encodeURIComponent('Activar plan FamiliSalud')}&body=${encodeURIComponent(msgFor())}`;
+  const empresaMsg = `Hola, quiero información del plan Empresas de FamiliSalud para ofrecerlo a mis empleados. Mi correo es ${email}.`;
+  const planCard = k => { const pl = PLANES_UI[k]; return `<button class="card" data-pick="${k}" style="text-align:left;gap:4px${sel.plan === k ? ';border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset' : ''}">
+      <span class="row"><b class="grow">${pl.nombre}</b>${tipoAct === k && acct && acct.plan === 'pago' ? '<span class="badge good">Tu plan</span>' : ''}</span>
+      <span><b>${money(pl.mensual)}</b> al mes · <b>${money(pl.anual)}</b> al año</span>
+      <span class="small muted">Hasta <b>${pl.cupo} personas con acceso</b> (cada una con su correo). Personas en la familia: ilimitadas.</span></button>`; };
   openDialog(`${head('Tu plan')}
     <p style="margin:0">${esc(est)}</p>
-    <div class="feat" style="grid-template-columns:1fr 1fr"><div><b>Mensual</b><span>${esc(PAGO.mensual)}</span><button class="btn sm" data-copy="${PAGO.montoMensual}">${ic('copy')} Copiar monto</button></div><div><b>Anual</b><span>${esc(PAGO.anual)}</span><span class="small muted">Ahorras 2 meses</span><button class="btn sm" data-copy="${PAGO.montoAnual}">${ic('copy')} Copiar monto</button></div></div>
-    <span class="small">Incluye: personas ilimitadas, acceso para cada integrante con su correo, asistente con IA, lectura de fotos, búsqueda de citas particulares, calendario conectado y canales de todas las EPS.</span>
+    <div style="display:grid;gap:8px" id="pl-cards">${planCard('familiar')}${planCard('plus')}</div>
+    <span class="small">Todos incluyen: asistente con IA, lectura de fotos, búsqueda de citas particulares, recordatorios, calendario conectado, guías de trámites y canales de todas las EPS. El plan anual ahorra 2 meses.</span>
     ${PAGO.llave ? `<div class="card" style="gap:10px;border-color:var(--accent)">
       <b>Paga con Nequi o desde cualquier banco (Bre-B)</b>
-      <div class="seg" role="group" aria-label="Plan" id="pq-seg"><button aria-pressed="true" data-plan="mensual">Mensual · $9.900</button><button aria-pressed="false" data-plan="anual">Anual · $99.000</button></div>
-      <img id="pq-img" src="${esc(PAGO.qrMensual)}" alt="Código QR Bre-B para pagar $9.900 a ${esc(PAGO.titular)}" style="width:min(280px,100%);justify-self:center;border-radius:16px">
-      <div class="chips" style="justify-content:center"><a class="btn sm" id="pq-dl" href="${esc(PAGO.qrMensual)}" download="familisalud-pago-mensual.png">Guardar QR</a><button class="btn sm primary" data-copy="${esc(PAGO.llave)}">${ic('copy')} Copiar llave ${esc(PAGO.llave)}</button></div>
+      <div class="seg" role="group" aria-label="Periodo" id="pq-seg"><button aria-pressed="true" data-per="mensual">Mensual</button><button aria-pressed="false" data-per="anual">Anual</button></div>
+      <div id="pq-box" style="display:grid;gap:10px"></div>
       <ol style="margin:0;padding-left:1.2em;display:grid;gap:6px" class="small">
-        <li><b>Desde otro celular o computador:</b> escanea el QR con Nequi o la app de tu banco. El monto ya viene puesto.</li>
-        <li><b>Desde este mismo celular:</b> toca <b>Guardar QR</b> y en tu app elige pagar con QR desde la galería, o envía a la llave <b>${esc(PAGO.llave)}</b> el monto del plan.</li>
+        <li><b>Desde otro celular o computador:</b> escanea el QR con Nequi o la app de tu banco.</li>
+        <li><b>Desde este mismo celular:</b> guarda el QR y en tu app elige pagar con QR desde la galería, o envía el monto a la llave <b>${esc(PAGO.llave)}</b>.</li>
         <li>Revisa que aparezca <b>${esc(PAGO.titular)}</b> antes de confirmar.</li>
         <li>Si te deja mensaje, escribe tu correo${email ? `: <b style="overflow-wrap:anywhere">${esc(email)}</b>` : ''}. Envía el comprobante y activamos tu plan en menos de 24 horas hábiles.</li>
       </ol>
-      <div class="chips">${email ? `<button class="btn sm" data-copy="${esc(email)}">${ic('copy')} Copiar mi correo</button>` : ''}${PAGO.whatsapp ? `<a class="btn sm" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('share')} Comprobante por WhatsApp</a>` : ''}<a class="btn sm" href="${esc(mail)}">Comprobante por correo</a></div>
+      <div class="chips">${email ? `<button class="btn sm" data-copy="${esc(email)}">${ic('copy')} Copiar mi correo</button>` : ''}<span id="pq-send"></span></div>
     </div>` : ''}
-    ${PAGO.linkMensual || PAGO.linkAnual ? `<div class="actions">${PAGO.linkMensual ? `<a class="btn primary" href="${esc(PAGO.linkMensual)}" target="_blank" rel="noopener">Pagar mensual con tarjeta</a>` : ''}${PAGO.linkAnual ? `<a class="btn" href="${esc(PAGO.linkAnual)}" target="_blank" rel="noopener">Pagar anual con tarjeta</a>` : ''}</div>` : ''}
+    <div class="card" style="gap:6px"><b>Plan Empresas</b><span class="small">Para empresas, colegios o fondos de empleados que quieren ofrecer FamiliSalud a sus trabajadores o afiliados. Precio según el número de familias, con más personas con acceso por familia.</span>
+      <span class="chips">${PAGO.whatsapp ? `<a class="btn sm primary" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(empresaMsg)}" target="_blank" rel="noopener">${ic('share')} Escríbenos por WhatsApp</a>` : ''}<a class="btn sm ${PAGO.whatsapp ? '' : 'primary'}" href="mailto:${PAGO.correo}?subject=${encodeURIComponent('Plan Empresas FamiliSalud')}&body=${encodeURIComponent(empresaMsg)}">Pedir información por correo</a></span></div>
     <p class="small muted" style="margin:0">¿Dudas con el pago? Escribe a <span class="mono">${esc(PAGO.correo)}</span>.</p>`, r => {
-    r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
-    r.querySelectorAll('#pq-seg [data-plan]').forEach(b => b.onclick = () => {
-      const an = b.dataset.plan === 'anual'; r.querySelectorAll('#pq-seg [data-plan]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-      const img = r.querySelector('#pq-img'), dl = r.querySelector('#pq-dl');
-      img.src = an ? PAGO.qrAnual : PAGO.qrMensual; img.alt = `Código QR Bre-B para pagar ${an ? '$99.000' : '$9.900'} a ${PAGO.titular}`;
-      dl.href = img.src; dl.download = `familisalud-pago-${an ? 'anual' : 'mensual'}.png`;
+    const draw = () => {
+      const pl = PLANES_UI[sel.plan], monto = pl[sel.per], qr = sel.per === 'anual' ? pl.qrAnual : pl.qrMensual;
+      r.querySelector('#pl-cards').innerHTML = planCard('familiar') + planCard('plus');
+      r.querySelectorAll('#pq-seg [data-per]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.per === sel.per)));
+      r.querySelector('#pq-box').innerHTML = `<div class="row"><span class="grow"><span class="small muted">${esc(pl.nombre)} · ${sel.per}</span><br><b style="font-size:1.35rem">${money(monto)}</b></span><button class="btn sm" data-copy="${monto}">${ic('copy')} Copiar monto</button></div>
+        ${qr ? `<img src="${esc(qr)}" alt="Código QR Bre-B para pagar ${money(monto)} a ${esc(PAGO.titular)}" style="width:min(280px,100%);justify-self:center;border-radius:16px"><div class="chips" style="justify-content:center"><a class="btn sm" href="${esc(qr)}" download="familisalud-${sel.plan}-${sel.per}.png">Guardar QR</a><button class="btn sm primary" data-copy="${esc(PAGO.llave)}">${ic('copy')} Copiar llave ${esc(PAGO.llave)}</button></div>`
+          : `<div class="notice" style="margin:0"><span>Para este plan envía <b>${money(monto)}</b> a la llave <b>${esc(PAGO.llave)}</b> desde Nequi o tu banco.</span><button class="btn sm primary" data-copy="${esc(PAGO.llave)}">${ic('copy')} Copiar llave</button></div>`}`;
+      r.querySelector('#pq-send').innerHTML = `${PAGO.whatsapp ? `<a class="btn sm" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(msgFor())}" target="_blank" rel="noopener">${ic('share')} Comprobante por WhatsApp</a>` : ''}<a class="btn sm" href="${esc(mailFor())}">Comprobante por correo</a>`;
+    };
+    r.addEventListener('click', e => {
+      const pick = e.target.closest('[data-pick]'); if (pick) { sel.plan = pick.dataset.pick; draw(); return; }
+      const per = e.target.closest('[data-per]'); if (per) { sel.per = per.dataset.per; draw(); return; }
+      const cp = e.target.closest('[data-copy]'); if (cp) copyText(cp.dataset.copy);
     });
+    draw();
   });
 }
 function openCalendar() {
@@ -1295,9 +1319,10 @@ async function openAdmin() {
   const estado = c => c.plan === 'pago' ? `Pagado hasta el ${fmtDate(String(c.hasta).slice(0, 10))} (${c.dias} días)` : c.plan === 'prueba' ? `Prueba gratis: quedan ${c.dias} días (hasta ${fmtDate(String(c.hasta).slice(0, 10))})` : 'Vencido: no puede guardar cambios';
   const last = {}; let filt = '';
   const card = c => `<div class="card" style="gap:8px${last[c.userId] ? ';border-color:var(--good)' : ''}" id="adc-${esc(c.userId)}"><div class="row"><span class="grow"><b style="overflow-wrap:anywhere">${esc(c.email || c.userId)}</b><br><span class="small muted">Cuenta creada el ${fmtDate(c.creada.slice(0, 10))}</span></span><span class="badge ${c.plan === 'pago' ? 'good' : c.plan === 'prueba' ? 'accent' : 'crit'}">${c.plan === 'pago' ? 'Pagando' : c.plan === 'prueba' ? 'Prueba' : 'Vencido'}</span></div>
-      <span class="small"><b>${esc(estado(c))}</b></span>
+      <span class="small"><b>${esc(estado(c))}</b><br>Plan ${esc(c.tipoNombre || 'Familiar')} · ${c.cupo || 4} personas con acceso${c.borraEl ? ` · <span style="color:var(--crit)">se borra el ${fmtDate(String(c.borraEl).slice(0, 10))}</span>` : ''}</span>
       ${last[c.userId] ? `<div class="notice" style="margin:0"><span>✓ ${esc(last[c.userId].msg)}</span><button class="btn sm" data-undo="${esc(c.userId)}">Deshacer</button></div>` : ''}
-      <div class="chips"><button class="btn sm primary" data-ad="mes" data-u="${esc(c.userId)}">+1 mes</button><button class="btn sm" data-ad="anio" data-u="${esc(c.userId)}">+1 año</button><button class="btn sm" data-ad="prueba7" data-u="${esc(c.userId)}">+7 días de prueba</button>${c.plan === 'pago' ? `<button class="btn sm danger" data-ad="quitar" data-u="${esc(c.userId)}">Quitar plan</button>` : ''}</div></div>`;
+      <div class="chips"><button class="btn sm primary" data-ad="mes" data-u="${esc(c.userId)}">+1 mes</button><button class="btn sm" data-ad="anio" data-u="${esc(c.userId)}">+1 año</button><button class="btn sm" data-ad="prueba7" data-u="${esc(c.userId)}">+7 días de prueba</button>${c.plan === 'pago' ? `<button class="btn sm danger" data-ad="quitar" data-u="${esc(c.userId)}">Quitar plan</button>` : ''}</div>
+      <div class="chips"><span class="small muted">Tipo:</span>${[['familiar', 'Familiar (4)'], ['plus', 'Plus (8)']].map(([t, l]) => `<button class="btn sm" data-tipo="${t}" data-u="${esc(c.userId)}" aria-pressed="${(c.tipo || 'familiar') === t}">${l}</button>`).join('')}<input type="number" min="1" max="200" inputmode="numeric" aria-label="Personas con acceso (Empresa)" id="adn-${esc(c.userId)}" value="${c.tipo === 'empresa' ? c.cupo : 12}" style="width:4.5em"><button class="btn sm" data-tipo="empresa" data-u="${esc(c.userId)}" aria-pressed="${c.tipo === 'empresa'}">Empresa</button></div></div>`;
   const list = () => j.cuentas.filter(c => !filt || (c.email || '').toLowerCase().includes(filt.toLowerCase())).slice(0, 80).map(card).join('') || '<span class="muted">Sin resultados.</span>';
   const stats = () => `<div><b>${j.total}</b><span class="small muted">cuentas</span></div><div><b>${j.prueba}</b><span class="small muted">en prueba</span></div><div><b>${j.pagos}</b><span class="small muted">pagando</span></div>`;
   const send = async (userId, body) => {
@@ -1315,11 +1340,12 @@ async function openAdmin() {
     const redraw = () => { box.innerHTML = list(); r.querySelector('#ad-stats').innerHTML = stats(); };
     r.querySelector('#ad-q').oninput = e => { filt = e.target.value.trim(); redraw(); };
     box.addEventListener('click', async e => {
-      const b = e.target.closest('[data-ad],[data-undo]'); if (!b) return;
+      const b = e.target.closest('[data-ad],[data-undo],[data-tipo]'); if (!b) return;
       const u = b.dataset.u || b.dataset.undo; const c = j.cuentas.find(x => x.userId === u);
       box.querySelectorAll('button').forEach(x => x.disabled = true); const old = b.textContent; b.textContent = 'Guardando…';
       try {
-        if (b.dataset.undo) { await send(u, { accion: 'restaurar', pagoHasta: last[u].prev.pagoHasta ?? null, trialHasta: last[u].prev.trialHasta }); delete last[u]; toast('Cambio deshecho'); }
+        if (b.dataset.undo) { const pv = last[u].prev; await (pv.tipo ? send(u, { accion: 'plan', tipo: pv.tipo, cupo: pv.cupo }) : send(u, { accion: 'restaurar', pagoHasta: pv.pagoHasta ?? null, trialHasta: pv.trialHasta })); delete last[u]; toast('Cambio deshecho'); }
+        else if (b.dataset.tipo) { const prev = { tipo: c.tipo || 'familiar', cupo: c.cupo || 4 }; const n = b.dataset.tipo === 'empresa' ? Number((document.getElementById('adn-' + u) || {}).value) : undefined; const nc = await send(u, { accion: 'plan', tipo: b.dataset.tipo, cupo: n }); last[u] = { prev, msg: `Plan cambiado a ${nc.tipoNombre} (${nc.cupo} personas con acceso).` }; toast('Guardado'); }
         else { const prev = { pagoHasta: c.pagoHasta ?? null, trialHasta: c.trialHasta }; const nc = await send(u, { accion: b.dataset.ad }); last[u] = { prev, msg: `${ACC[b.dataset.ad]}. Ahora: ${estado(nc)}.` }; toast('Guardado'); }
       } catch (err) { toast(err.message || 'No se pudo guardar.'); b.textContent = old; }
       redraw(); const el = document.getElementById('adc-' + u); if (el) el.scrollIntoView({ block: 'nearest' });
@@ -1334,6 +1360,8 @@ function accessHTML() {
   const f = famInfo, admin = rol === 'admin';
   return `<div class="sec"><div class="sec-head"><h2>Quién tiene acceso</h2>${admin ? `<button class="btn primary sm" data-act="invite">${ic('plus')} Invitar</button>` : ''}</div>
     <p class="small muted" style="margin:0">Cada integrante entra con su propio correo y ve la misma agenda. ${admin ? 'Tú decides quién puede editar y quién solo puede ver.' : ''}</p>
+    <span class="small"><b>${usados()} de ${cupoActual()}</b> personas con acceso en tu plan ${esc((acct && acct.tipoNombre) || 'Familiar')}.</span>
+    ${admin && usados() >= cupoActual() ? `<div class="notice" style="margin:0"><span>Llegaste al límite de tu plan. Para invitar a más personas, pasa al plan Familiar Plus (8 personas).</span><button class="btn sm primary" data-act="plan">Ver planes</button></div>` : ''}
     ${f.miembros.map(m => `<${admin && !m.dueno && !m.yo ? `button class="card" data-acc="${esc(m.userId)}"` : 'div class="card"'}><span class="row"><b class="grow" style="overflow-wrap:anywhere">${esc(m.email)}${m.yo ? ' (tú)' : ''}</b><span class="badge ${m.rol === 'admin' ? 'accent' : m.rol === 'lector' ? '' : 'good'}">${m.dueno ? 'Creó la familia' : ROL_TXT[m.rol]}</span></span></${admin && !m.dueno && !m.yo ? 'button' : 'div'}>`).join('')}
     ${f.invitaciones.length ? `<div class="label">Invitaciones pendientes</div>` + f.invitaciones.map(i => `<div class="card"><span class="row"><b class="grow" style="overflow-wrap:anywhere">${esc(i.email)}</b><span class="badge warn">${ROL_TXT[i.rol]} · pendiente</span></span>${admin ? `<span class="chips"><button class="btn sm" data-inv-share="${esc(i.email)}">${ic('share')} Enviar aviso</button><button class="btn sm danger" data-inv-cancel="${esc(i.email)}">Cancelar</button></span>` : ''}</div>`).join('') : ''}
     ${!f.esDueno ? '<button class="btn ghost sm danger" data-act="leave" style="width:fit-content">Salir de esta familia</button>' : ''}
@@ -1343,6 +1371,7 @@ async function famAction(body, okMsg) {
   try {
     const r = await fetch('/api/family', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
+    if (!r.ok && j.code === 'cupo') { toast(j.error); openPlan(); return null; }
     if (!r.ok) throw new Error(j.error || 'No se pudo completar.');
     if (dlg.open) dlg.close();
     if (['aceptar', 'rechazar', 'salir'].includes(body.accion)) { toast(okMsg); invitacion = null; await loadCloud(); return j; }
@@ -1350,6 +1379,7 @@ async function famAction(body, okMsg) {
   } catch (e) { toast(e.message || 'No se pudo completar.'); return null; }
 }
 function openInvite() {
+  if (usados() >= cupoActual()) { toast(`Tu plan permite ${cupoActual()} personas con acceso. Pasa a un plan más grande para invitar a más.`); openPlan(); return; }
   openDialog(`${head('Invitar a un integrante')}
     <p class="muted" style="margin:0">Escribe el correo con el que esa persona va a entrar (o su cuenta de Google). Le llegará la invitación al iniciar sesión.</p>
     <form id="iv-f" style="display:grid;gap:12px">

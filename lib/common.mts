@@ -1,4 +1,4 @@
-// Utilidades compartidas por las funciones de Familia al Día.
+// Utilidades compartidas por las funciones de FamiliSalud.
 import { getStore } from "@netlify/blobs";
 import { getUser } from "@netlify/identity";
 
@@ -26,7 +26,18 @@ const randomToken = () => {
   return Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
 };
 
-export type Cuenta = { userId: string; email: string; creada: string; trialHasta: string; pagoHasta: string | null; calToken: string; notas?: string };
+export type Cuenta = { userId: string; email: string; creada: string; trialHasta: string; pagoHasta: string | null; calToken: string; notas?: string; tipo?: TipoPlan; cupo?: number; avisoBorrado?: string | null; borrado?: string | null };
+
+// Planes: cuántas personas pueden entrar con su propio correo a la agenda de la familia.
+export type TipoPlan = "familiar" | "plus" | "empresa";
+export const PLANES: Record<TipoPlan, { nombre: string; cupo: number }> = {
+  familiar: { nombre: "Familiar", cupo: 4 },
+  plus: { nombre: "Familiar Plus", cupo: 8 },
+  empresa: { nombre: "Empresas", cupo: 8 },
+};
+export const cupoDe = (c: Cuenta | null | undefined) => Math.max(1, Math.min(200, Number(c?.cupo) || PLANES[c?.tipo || "familiar"]?.cupo || 4));
+export const RETENCION_DIAS = 365; // días con el plan vencido antes de avisar que se borrará la información
+export const AVISO_DIAS = 30;      // días entre el aviso y el borrado
 
 // Devuelve (y crea la primera vez) la cuenta del usuario con su prueba gratis y su token de calendario.
 export async function getCuenta(user: { id: string; email?: string }): Promise<Cuenta> {
@@ -51,7 +62,9 @@ export function estadoCuenta(c: Cuenta) {
   const activo = pagado || enPrueba;
   const hasta = pagado ? c.pagoHasta : c.trialHasta;
   const dias = Math.max(0, Math.ceil((Date.parse(hasta!) - now) / 864e5));
-  return { activo, plan: pagado ? "pago" : enPrueba ? "prueba" : "vencido", hasta, dias };
+  const tipo: TipoPlan = c.tipo && PLANES[c.tipo] ? c.tipo : "familiar";
+  const borraEl = c.avisoBorrado && !activo ? new Date(Date.parse(c.avisoBorrado) + AVISO_DIAS * 864e5).toISOString() : null;
+  return { activo, plan: pagado ? "pago" : enPrueba ? "prueba" : "vencido", hasta, dias, tipo, tipoNombre: PLANES[tipo].nombre, cupo: cupoDe(c), borraEl, borrado: c.borrado || null };
 }
 
 export const isAdmin = (user: { roles?: string[] }) => Array.isArray(user.roles) && user.roles.includes("admin");

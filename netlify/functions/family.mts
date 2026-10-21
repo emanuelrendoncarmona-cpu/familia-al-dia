@@ -1,6 +1,6 @@
 // /api/family — invitar integrantes por correo, aceptar invitaciones, roles y salir de una familia.
 import type { Config } from "@netlify/functions";
-import { requireUser, json, resolveFamily, joinFamily, famStores, emailKey, familiaPublica, ROLES, type Familia, type Invite } from "../../lib/common.mts";
+import { requireUser, json, resolveFamily, joinFamily, famStores, emailKey, familiaPublica, ROLES, stores, cupoDe, type Familia, type Invite, type Cuenta } from "../../lib/common.mts";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -45,7 +45,9 @@ export default async (req: Request) => {
     const r = ROLES.includes(body.rol) ? body.rol : "editor";
     if (!EMAIL.test(email)) return json({ error: "Escribe un correo válido." }, 400);
     if (fam.miembros.some(m => m.email.toLowerCase() === email)) return json({ error: "Esa persona ya tiene acceso." }, 400);
-    if (fam.miembros.length + fam.invitaciones.length >= 12) return json({ error: "Máximo 12 personas con acceso por familia." }, 400);
+    const cuentaDueno = (await stores.cuentas().get(fam.ownerId, { type: "json" })) as Cuenta | null;
+    const cupo = cupoDe(cuentaDueno);
+    if (fam.miembros.length + fam.invitaciones.length >= cupo) return json({ error: `Tu plan permite ${cupo} personas con acceso (contándote a ti y las invitaciones pendientes). Pasa a un plan más grande para invitar a más.`, code: "cupo" }, 400);
     const inv: Invite = { familyId: fam.id, rol: r, por: user.email || "", familia: fam.nombre, at: new Date().toISOString() };
     await famStores.invites().setJSON(emailKey(email), inv);
     fam.invitaciones = fam.invitaciones.filter(i => i.email !== email).concat({ email, rol: r, at: inv.at, por: inv.por });
