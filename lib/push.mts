@@ -7,9 +7,12 @@ const b64u = (b: Buffer | Uint8Array) => Buffer.from(b).toString("base64url");
 const unb64u = (s: string) => Buffer.from(String(s || ""), "base64url");
 const hmac = (key: Buffer, data: Buffer) => crypto.createHmac("sha256", key).update(data).digest();
 
+// La llave pública NO es secreta: se envía a cada navegador para suscribirse. Se deja aquí fija
+// para evitar errores de copiado; la privada va solo en la variable de entorno VAPID_PRIVATE_KEY.
+const VAPID_PUBLIC = "BKQ5Mtno9A-pzaclwmw4zwsDCBxOujFmEAta8LwyDDU0M0htM0GMHN8g_-7NUhSZ9Uyv3BDJsyveiM-oY5WsOWY";
 export function vapidKeys() {
-  const pub = process.env.VAPID_PUBLIC_KEY || "", priv = process.env.VAPID_PRIVATE_KEY || "";
-  return pub && priv ? { pub, priv, subject: process.env.VAPID_SUBJECT || "mailto:emanuelrendoncarmona@gmail.com" } : null;
+  const priv = process.env.VAPID_PRIVATE_KEY || "";
+  return priv ? { pub: VAPID_PUBLIC, priv, subject: process.env.VAPID_SUBJECT || "mailto:emnova.col@gmail.com" } : null;
 }
 
 export function encrypt(sub: Sub, payload: Buffer, salt = crypto.randomBytes(16)) {
