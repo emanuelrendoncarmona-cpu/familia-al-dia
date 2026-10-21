@@ -10,7 +10,30 @@ export const stores = {
   cuentas: () => getStore({ name: "cuentas", consistency: "strong" }),
   calTokens: () => getStore({ name: "cal-tokens", consistency: "strong" }),
   uso: () => getStore({ name: "uso-ia", consistency: "strong" }),
+  referidos: () => getStore({ name: "referidos", consistency: "strong" }),
+  gestiones: () => getStore({ name: "gestiones", consistency: "strong" }),
+  ajustes: () => getStore({ name: "ajustes", consistency: "strong" }),
 };
+
+// Precios en pesos (los muestra la app; el plan se activa a mano desde el panel al ver el pago).
+export const PRECIOS = { mensual: 14900, anual: 149000, gestion: 19900 };
+
+// Uso justo del asistente con IA por familia y por mes (cada consulta gasta créditos de Netlify).
+export const USO_MES = { asistente: 150, busqueda: 15 };
+const mesActual = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 7); // mes en hora de Colombia
+export async function usoMes(famId: string) {
+  const u = (await stores.uso().get(`mes/${famId}/${mesActual()}`, { type: "json" })) as { asistente?: number; busqueda?: number } | null;
+  return { asistente: u?.asistente || 0, busqueda: u?.busqueda || 0 };
+}
+export async function gastarUso(famId: string, tipo: "asistente" | "busqueda") {
+  const key = `mes/${famId}/${mesActual()}`;
+  const u = (await stores.uso().get(key, { type: "json" })) as { asistente?: number; busqueda?: number } | null || {};
+  const n = (u[tipo] || 0);
+  if (n >= USO_MES[tipo]) return false;
+  u[tipo] = n + 1;
+  await stores.uso().setJSON(key, u);
+  return true;
+}
 
 export const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
@@ -26,16 +49,17 @@ const randomToken = () => {
   return Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
 };
 
-export type Cuenta = { userId: string; email: string; creada: string; trialHasta: string; pagoHasta: string | null; calToken: string; notas?: string; tipo?: TipoPlan; cupo?: number; avisoBorrado?: string | null; borrado?: string | null };
+export type Cuenta = { userId: string; email: string; creada: string; trialHasta: string; pagoHasta: string | null; calToken: string; notas?: string; tipo?: string; cupo?: number; avisoBorrado?: string | null; borrado?: string | null; refCode?: string; referidoPor?: string | null; refPremiado?: boolean; referidosPagos?: number };
 
-// Planes: cuántas personas pueden entrar con su propio correo a la agenda de la familia.
-export type TipoPlan = "familiar" | "plus" | "empresa";
+// Plan Familiar: personas ilimitadas (con un tope alto solo para evitar abusos). Empresas: cupo a la medida.
+export type TipoPlan = "familiar" | "empresa";
+export const CUPO_FAMILIAR = 30;
 export const PLANES: Record<TipoPlan, { nombre: string; cupo: number }> = {
-  familiar: { nombre: "Familiar", cupo: 4 },
-  plus: { nombre: "Familiar Plus", cupo: 8 },
-  empresa: { nombre: "Empresas", cupo: 8 },
+  familiar: { nombre: "Familiar", cupo: CUPO_FAMILIAR },
+  empresa: { nombre: "Empresas", cupo: CUPO_FAMILIAR },
 };
-export const cupoDe = (c: Cuenta | null | undefined) => Math.max(1, Math.min(200, Number(c?.cupo) || PLANES[c?.tipo || "familiar"]?.cupo || 4));
+const tipoDe = (c: Cuenta | null | undefined): TipoPlan => (c?.tipo === "empresa" ? "empresa" : "familiar");
+export const cupoDe = (c: Cuenta | null | undefined) => tipoDe(c) === "empresa" ? Math.max(1, Math.min(500, Number(c?.cupo) || CUPO_FAMILIAR)) : CUPO_FAMILIAR;
 export const RETENCION_DIAS = 365; // días con el plan vencido antes de avisar que se borrará la información
 export const AVISO_DIAS = 30;      // días entre el aviso y el borrado
 
@@ -52,6 +76,13 @@ export async function getCuenta(user: { id: string; email?: string }): Promise<C
   } else if (user.email && c.email !== user.email) {
     c.email = user.email; await s.setJSON(user.id, c);
   }
+  if (!c.refCode) {
+    // Código para invitar a otras familias (no revela nada de la cuenta).
+    const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const b = new Uint8Array(6); crypto.getRandomValues(b);
+    c.refCode = Array.from(b, x => abc[x % abc.length]).join("");
+    await s.setJSON(user.id, c);
+    await stores.referidos().setJSON(c.refCode, { userId: user.id });
+  }
   return c;
 }
 
@@ -62,7 +93,7 @@ export function estadoCuenta(c: Cuenta) {
   const activo = pagado || enPrueba;
   const hasta = pagado ? c.pagoHasta : c.trialHasta;
   const dias = Math.max(0, Math.ceil((Date.parse(hasta!) - now) / 864e5));
-  const tipo: TipoPlan = c.tipo && PLANES[c.tipo] ? c.tipo : "familiar";
+  const tipo = tipoDe(c);
   const borraEl = c.avisoBorrado && !activo ? new Date(Date.parse(c.avisoBorrado) + AVISO_DIAS * 864e5).toISOString() : null;
   return { activo, plan: pagado ? "pago" : enPrueba ? "prueba" : "vencido", hasta, dias, tipo, tipoNombre: PLANES[tipo].nombre, cupo: cupoDe(c), borraEl, borrado: c.borrado || null };
 }

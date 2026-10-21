@@ -360,14 +360,11 @@ let netlifyId = null, idSettings = null, authUser = null, acct = null, isAdminUs
 const IDENTITY_URL = 'https://cdn.jsdelivr.net/npm/@netlify/identity@2.0.0/+esm';
 // Planes y forma de pago. Pega aquí tus links de Wompi o Mercado Pago y tu WhatsApp de ventas (solo números, con 57).
 const PAGO = { llave: '0093101200', titular: 'Emnova Emanuel Rendon', linkMensual: '', linkAnual: '', whatsapp: '', correo: 'emanuelrendoncarmona@gmail.com' };
-// Planes: el precio cubre a toda la familia. "cupo" = personas que entran con su propio correo (personas en la familia: ilimitadas).
-const PLANES_UI = {
-  familiar: { nombre: 'Familiar', cupo: 4, mensual: 9900, anual: 99000, qrMensual: 'pago-mensual.png', qrAnual: 'pago-anual.png' },
-  plus: { nombre: 'Familiar Plus', cupo: 8, mensual: 14900, anual: 149000, qrMensual: '', qrAnual: '' },
-};
+// Plan único: personas ilimitadas. Los QR se agregan cuando estén listos (mientras, se paga con llave + monto).
+const PLAN = { nombre: 'Familiar', mensual: 14900, anual: 149000, gestion: 19900, qrMensual: '', qrAnual: '', qrGestion: '' };
 const money = n => '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-const cupoActual = () => (acct && acct.cupo) || 4;
-const usados = () => famInfo ? famInfo.miembros.length + famInfo.invitaciones.length : 1;
+let gest = [], gestPrecio = PLAN.gestion;
+const GEST_TXT = { pago: ['Esperando tu pago', 'warn'], proceso: ['Gestionando con la EPS', 'accent'], lista: ['¡Cita lista!', 'good'], no: ['No se pudo', 'crit'] };
 const DEMO_MSG = 'Estás viendo la familia de ejemplo: no hay datos tuyos para exportar. Toca “Empezar con la mía” para agregar tu familia.';
 const aiOn = () => !!sampleApi || mode === 'netlify';
 const photoOn = () => sampleImages || mode === 'netlify';
@@ -443,6 +440,7 @@ async function refreshCloud(force) {
   try {
     const r = await fetch('/api/data', { credentials: 'same-origin' }); if (!r.ok) return; const j = await r.json(); lastFetch = Date.now();
     if (j.pendingInvite) return;
+    if (force || gest.some(g => g.estado === 'pago' || g.estado === 'proceso')) loadGest();
     const sig = JSON.stringify([acct, famInfo, rol, invitacion]);
     acct = j.cuenta; famInfo = j.familia; rol = j.rol || rol; invitacion = j.invitacion;
     if (sig !== JSON.stringify([acct, famInfo, rol, invitacion])) { setStatus(); render(); }
@@ -466,6 +464,7 @@ function setStatus() {
 
 async function boot() {
   let loaded = null;
+  try { const q = new URLSearchParams(location.search); const ref = (q.get('ref') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12); if (ref) { localStorage.setItem('fs-ref', ref); q.delete('ref'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash); if (!authNotice) authNotice = 'Te invitaron a FamiliSalud. Crea tu cuenta y pruébala 14 días gratis.'; } } catch (_) {}
   if (!window.claude && location.protocol.startsWith('http')) {
     try {
       netlifyId = await import(IDENTITY_URL);
@@ -521,6 +520,12 @@ async function loadCloud() {
   if (j.agenda) S.version = j.agenda.version || 0;
   setStatus(); render();
   checkPush().then(() => { if (!dlg.open) render(); });
+  loadGest();
+  let ref = null; try { ref = localStorage.getItem('fs-ref'); } catch (_) {}
+  if (ref && acct && acct.puedeReferido) {
+    fetch('/api/data', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accion: 'referido', code: ref }) })
+      .then(r => r.json()).then(k => { try { localStorage.removeItem('fs-ref'); } catch (_) {} if (k && k.ok) { acct.puedeReferido = false; acct.referidoPor = true; } }).catch(() => {});
+  } else if (ref && acct && !acct.puedeReferido) { try { localStorage.removeItem('fs-ref'); } catch (_) {} }
   if (!j.agenda && rol === 'admin') {
     const legacy = readLocal(LS_KEY);
     if (legacy && Array.isArray(legacy.miembros) && legacy.miembros.length && !legacy.ejemplo) {
@@ -643,6 +648,11 @@ function alerts() {
     const n = -daysUntil(x.fecha); const m = member(x.miembroId);
     if (n >= 5) out.push({ lvl: n >= 10 ? 'crit' : 'warn', k: 'alert', title: `Llevas ${n} días esperando · ${x.que} (${first(m)})`, sub: 'Insiste por otro canal o pon una queja. Te decimos cómo.', act: ['Qué hago', () => openReclamo(x.id)] });
   });
+  gest.forEach(g => {
+    if (g.estado === 'lista' && !g.agregada) out.push({ lvl: 'warn', k: 'check', title: `¡Te sacamos la cita! ${g.que} · ${first({ nombre: g.persona.nombre })}`, sub: `${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}. Agrégala a tu agenda.`, act: ['Ver', () => openGestDetail(g.id)] });
+    else if (g.estado === 'pago') out.push({ lvl: 'info', k: 'clock', title: `Falta tu pago · cita de ${g.que}`, sub: `Paga ${money(g.precio)} para que empecemos a pedirla.`, act: ['Pagar', () => openGestDetail(g.id)] });
+    else if (g.estado === 'no') out.push({ lvl: 'warn', k: 'alert', title: `No pudimos sacar la cita de ${g.que}`, sub: 'Te devolvemos el dinero. Mira las opciones.', act: ['Ver', () => openGestDetail(g.id)] });
+  });
   const rank = { crit: 0, warn: 1, info: 2 };
   return out.sort((a, b) => rank[a.lvl] - rank[b.lvl]);
 }
@@ -764,7 +774,7 @@ function saludHTML() {
     h += `<div class="row"><span class="small muted grow">Cuando la EPS demora o prefieres pagar: busca opciones, compáralas y verifica al médico antes de ir.</span><button class="btn primary sm" data-act="particular">${ic('spark')} Buscar cita particular</button></div>` + (list.length ? list.map(o => { const m = member(o.miembroId); return `<button class="card" data-opc="${o.id}"><span class="row"><b class="grow">${esc(o.nombre)}</b>${o.precio ? `<span class="badge">${esc(o.precio)}</span>` : ''}</span><span class="small muted">${esc(o.especialidad || '')}${o.ciudad ? ' · ' + esc(o.ciudad) : ''}${m ? ' · para ' + esc(first(m)) : ''}${o.calificacion ? ' · ' + esc(o.calificacion) : ''}</span></button>`; }).join('') : `<div class="empty"><b>Aún no has guardado opciones</b><span class="muted small">Busca una especialidad en tu ciudad y guarda las que te interesen para compararlas.</span></div>`);
   } else if (salud === 'tramites') {
     const list = [...(S.sols || [])].sort((a, b) => (a.estado !== 'esperando') - (b.estado !== 'esperando') || a.fecha.localeCompare(b.fecha));
-    h += `<div class="row"><span class="small muted grow">Citas o autorizaciones que pediste y aún no te dan. Te avisamos si pasan muchos días.</span><button class="btn primary sm" data-act="pedir">${ic('plus')} Pedir cita</button></div>` + (list.length ? list.map(x => { const m = member(x.miembroId); const n = -daysUntil(x.fecha); const cls = x.estado !== 'esperando' ? 'good' : n >= 10 ? 'crit' : n >= 5 ? 'warn' : ''; return `<button class="card" data-sol="${x.id}"><span class="row"><b class="grow">${esc(x.que)}</b><span class="badge ${cls}">${x.estado === 'esperando' ? (n === 0 ? 'Pedida hoy' : `Esperando · ${n} ${n === 1 ? 'día' : 'días'}`) : 'Resuelta'}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')} · pedida por ${esc(x.canal || '—')} el ${fmtDate(x.fecha)}${x.radicado ? ` · radicado <span class="mono">${esc(x.radicado)}</span>` : ''}</span></button>`; }).join('') : `<div class="empty"><b>No tienes trámites pendientes</b><span class="muted small">Cuando pidas una cita y te digan “le devolvemos la llamada”, anótalo aquí.</span></div>`);
+    h += gestListHTML() + `<div class="row"><span class="small muted grow">Citas o autorizaciones que pediste y aún no te dan. Te avisamos si pasan muchos días.</span><button class="btn primary sm" data-act="pedir">${ic('plus')} Pedir cita</button></div>` + (list.length ? list.map(x => { const m = member(x.miembroId); const n = -daysUntil(x.fecha); const cls = x.estado !== 'esperando' ? 'good' : n >= 10 ? 'crit' : n >= 5 ? 'warn' : ''; return `<button class="card" data-sol="${x.id}"><span class="row"><b class="grow">${esc(x.que)}</b><span class="badge ${cls}">${x.estado === 'esperando' ? (n === 0 ? 'Pedida hoy' : `Esperando · ${n} ${n === 1 ? 'día' : 'días'}`) : 'Resuelta'}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')} · pedida por ${esc(x.canal || '—')} el ${fmtDate(x.fecha)}${x.radicado ? ` · radicado <span class="mono">${esc(x.radicado)}</span>` : ''}</span></button>`; }).join('') : `<div class="empty"><b>No tienes trámites pendientes</b><span class="muted small">Cuando pidas una cita y te digan “le devolvemos la llamada”, anótalo aquí.</span></div>`);
   } else if (salud === 'ordenes') {
     const list = [...S.auts].sort((a, b) => (a.estado === 'usada') - (b.estado === 'usada') || (a.vence || '9').localeCompare(b.vence || '9'));
     h += `<div class="row"><span class="small muted grow">Te avisamos cuando a una autorización le falten 15 días o menos.</span><button class="btn primary sm" data-act="add-aut">${ic('plus')} Agregar</button></div>` + (list.length ? list.map(a => { const m = member(a.miembroId); const s = autStatus(a); const n = daysUntil(a.vence); const span = a.exp && a.vence ? Math.max(1, daysUntil(a.vence) - daysUntil(a.exp)) : null; const used = span && n !== null ? Math.min(1, Math.max(0, 1 - n / span)) : 0; return `<button class="card" data-aut="${a.id}"><span class="row"><b class="grow">${esc(a.servicio)}</b><span class="badge ${s.cls}">${esc(s.txt)}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')}${a.numero ? ` · N.° <span class="mono">${esc(a.numero)}</span>` : ''} · vence ${fmtDate(a.vence)}</span>${a.estado !== 'usada' && span ? `<span class="mini" aria-hidden="true"><i style="width:${Math.round(used * 100)}%;background:var(--${s.cls === 'good' ? 'accent' : s.cls || 'accent'})"></i></span>` : ''}</button>`; }).join('') : `<div class="empty"><b>Sin órdenes registradas</b><span class="muted small">Guarda aquí cada autorización con su fecha de vencimiento.</span></div>`);
@@ -790,7 +800,8 @@ function familiaHTML() {
   }).join('') : `<div class="empty"><b>Aún no hay nadie</b><span class="muted small">Agrega a las personas cuyas citas organizas.</span></div>`}</div>
   ${mode === 'netlify' && famInfo ? accessHTML() : ''}
   <div class="sec"><div class="sec-head"><h2>Ajustes</h2><button class="btn ghost sm" data-act="help">${ic('spark')} Ayuda y preguntas</button></div>
-    ${mode === 'netlify' && acct ? `<div class="card" style="gap:8px"><span><b>Tu cuenta</b><br><span class="small muted">${esc(acct.email || '')}</span><br><span class="badge ${acct.plan === 'pago' ? 'good' : acct.plan === 'prueba' ? 'accent' : 'crit'}">${acct.plan === 'pago' ? 'Plan activo hasta el ' + fmtDate(String(acct.hasta).slice(0, 10)) : acct.plan === 'prueba' ? `Prueba gratis · ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}` : 'Plan vencido'}</span><br><span class="small">Plan <b>${esc(acct.tipoNombre || 'Familiar')}</b> · hasta ${cupoActual()} personas con acceso</span></span><span class="chips"><button class="btn sm ${acct.plan === 'pago' ? '' : 'primary'}" data-act="plan">${acct.plan === 'pago' ? 'Ver planes' : 'Activar plan'}</button><button class="btn sm" data-act="logout">Cerrar sesión</button></span></div>
+    ${mode === 'netlify' && acct ? `<div class="card" style="gap:8px"><span><b>Tu cuenta</b><br><span class="small muted">${esc(acct.email || '')}</span><br><span class="badge ${acct.plan === 'pago' ? 'good' : acct.plan === 'prueba' ? 'accent' : 'crit'}">${acct.plan === 'pago' ? 'Plan activo hasta el ' + fmtDate(String(acct.hasta).slice(0, 10)) : acct.plan === 'prueba' ? `Prueba gratis · ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}` : 'Plan vencido'}</span><br><span class="small">Plan <b>${esc(acct.tipoNombre || 'Familiar')}</b> · personas ilimitadas</span></span><span class="chips"><button class="btn sm ${acct.plan === 'pago' ? '' : 'primary'}" data-act="plan">${acct.plan === 'pago' ? 'Ver planes' : 'Activar plan'}</button><button class="btn sm" data-act="logout">Cerrar sesión</button></span></div>
+    ${acct.refCode ? `<div class="card"><div class="row"><span class="grow"><b>Invita a otra familia y gana 1 mes gratis</b><br><span class="small muted">Cuando una familia que invitaste activa su plan, te sumamos un mes.${acct.referidos ? ` Llevas ${acct.referidos}.` : ''}</span></span><button class="btn sm primary" data-act="ref">${ic('share')} Invitar</button></div></div>` : ''}
     ${pushCardHTML()}
     <div class="card"><div class="row"><span class="grow"><b>Conectar mi calendario</b><br><span class="small muted">Tus citas aparecen solas en Google Calendar o en el iPhone.</span></span><button class="btn sm" data-act="calendar">Conectar</button></div></div>` : ''}
     <div class="card"><div class="row"><span class="grow"><b>Exportar a Google Sheets o Excel</b><br><span class="small muted">Descarga todas las citas en una tabla.</span></span><button class="btn sm" data-act="csv">Exportar citas</button></div></div>
@@ -822,6 +833,7 @@ function bind(app) {
   app.querySelectorAll('[data-guia]').forEach(b => b.onclick = () => openGuia(b.dataset.guia));
   app.querySelectorAll('[data-opc]').forEach(b => b.onclick = () => openOpcion(b.dataset.opc));
   app.querySelectorAll('[data-sol]').forEach(b => b.onclick = () => openSol(b.dataset.sol));
+  app.querySelectorAll('[data-gest]').forEach(b => b.onclick = () => openGestDetail(b.dataset.gest));
   $('#restoreIn')?.addEventListener('change', e => importData(e.target.files[0]));
   app.querySelectorAll('[data-del-ctl]').forEach(b => b.onclick = () => removeWithUndo('controles', b.dataset.delCtl, 'Control quitado'));
   app.querySelectorAll('[data-sugg]').forEach(b => b.onclick = () => { const i = $('#askIn'); i.value = b.dataset.sugg; if (i.form && i.form.requestSubmit) i.form.requestSubmit(); else i.focus(); });
@@ -831,7 +843,7 @@ function bind(app) {
   app.querySelectorAll('[data-act]').forEach(b => b.onclick = () => ({
     'push-on': () => enablePush(), 'push-off': () => disablePush(), 'push-test': () => testPush(), 'push-later': () => { try { localStorage.setItem('fad-push-no', '1'); } catch (_) {} render(); },
     'add-member': () => openMember(), 'new-cita': () => openCitaForm(), 'plus': () => openPlus(), 'week': () => shareWeek(), 'invite': () => openInvite(), 'inv-si': () => famAction({ accion: 'aceptar' }, 'Te uniste a la familia'), 'inv-no': () => famAction({ accion: 'rechazar' }, 'Invitación rechazada'), 'leave': () => openConfirm('¿Salir de esta familia?', 'Dejarás de ver su agenda. Podrás volver si te invitan de nuevo.', 'Salir', () => famAction({ accion: 'salir' }, 'Saliste de la familia')), 'particular': () => openParticular(), 'guias': () => go('salud', 'guias'), 'help': () => go('ayuda'), 'plan': () => openPlan(), 'calendar': () => openCalendar(), 'csv': () => exportCSV(), 'admin': () => openAdmin(), 'logout': () => doLogout(), 'install': () => openInstall(), 'backup': () => exportData(), 'restore': () => $('#restoreIn').click(), 'privacy': () => openPrivacy(), 'wipe': () => openConfirm('¿Borrar todos tus datos?', 'Se eliminan todas las personas, citas, órdenes, controles, medicamentos y trámites. No se puede deshacer.', 'Borrar todo', async () => { if (mode === 'netlify') { try { await fetch('/api/data', { method: 'DELETE', credentials: 'same-origin' }); } catch (_) {} try { localStorage.removeItem(lsKey()); } catch (_) {} S = emptyState(); view = 'inicio'; render(); toast('Datos borrados de tu cuenta'); return; } S = emptyState(); persist(); view = 'inicio'; render(); toast('Datos borrados'); }), 'add-aut': () => openAut(), 'add-ctl': () => openCtl(), 'add-med': () => openMed(),
-    'clear-day': () => { dayFilter = null; render(); }, 'pedir': () => openPedir({}), 'close-answer': () => { answer = null; render(); },
+    'clear-day': () => { dayFilter = null; render(); }, 'ref': () => shareRef(), 'gestion': () => openGestion({}), 'pedir': () => openPedir({}), 'close-answer': () => { answer = null; render(); },
     'clear-demo': () => openConfirm('¿Borrar la familia de ejemplo?', 'Se eliminan los datos de ejemplo para que empieces con los tuyos.', 'Borrar ejemplo', () => { const c = S.consent; S = emptyState(); S.consent = c; persist(); view = 'familia'; render(); openMember(); }),
   })[b.dataset.act]?.());
 }
@@ -1083,6 +1095,7 @@ ${text ? 'Mensaje:\n' + text : 'Lee la imagen adjunta.'}`;
         if (rp && rp !== '0') { const [y, mo, d] = fecha.split('-').map(Number); for (let i = 1; i < veces; i++) { const f = rp === 'm' ? isoLocal(new Date(y, mo - 1 + i, d)) : addDays(fecha, i * +rp); S.citas.push(Object.assign({}, data, { id: uid(), estado: 'pendiente', fecha: f, req: base.map(b => ({ t: b.t, ok: false })) })); } }
         if (pre.controlId) { const k = S.controles.find(x => x.id === pre.controlId); if (k) k.estado = 'agendado'; }
         if (pre.autId) { const a = S.auts.find(x => x.id === pre.autId); if (a) { a.estado = 'usada'; a.citaId = nc.id; } }
+        if (pre.gestionId) { const g = gest.find(x => x.id === pre.gestionId); if (g) g.agregada = true; gestPost({ accion: 'agregada', id: pre.gestionId }).catch(() => {}); }
         if (aiAut) S.auts.push({ id: uid(), miembroId: data.miembroId, servicio: data.especialidad || TIPOS[tipo].label, numero: aiAut.numero || '', exp: todayISO(), vence: okDate(aiAut.vence), estado: 'usada', citaId: nc.id });
       }
       persist(); dlg.close(); answer = null; render(); const rp2 = r.querySelector('#cf-rep')?.value; toast(editing ? 'Cita actualizada' : rp2 && rp2 !== '0' ? 'Citas guardadas' : `Cita guardada · ${fmtDate(fecha)}`);
@@ -1239,52 +1252,147 @@ async function askHelp(q) {
 document.addEventListener('click', e => { if (e.target.closest('[data-copy-mail]')) copyText(PAGO.correo); });
 
 // ---------- plan, calendario, exportar, admin ----------
+function payBoxHTML(monto, qr, nombreArchivo) {
+  return `<div class="row"><span class="grow"><span class="small muted">Valor a pagar</span><br><b style="font-size:1.35rem">${money(monto)}</b></span><button class="btn sm" data-copy="${monto}">${ic('copy')} Copiar monto</button></div>
+    ${qr ? `<img src="${esc(qr)}" alt="Código QR Bre-B para pagar ${money(monto)} a ${esc(PAGO.titular)}" style="width:min(280px,100%);justify-self:center;border-radius:16px"><div class="chips" style="justify-content:center"><a class="btn sm" href="${esc(qr)}" download="${esc(nombreArchivo)}.png">Guardar QR</a><button class="btn sm primary" data-copy="${esc(PAGO.llave)}">${ic('copy')} Copiar llave ${esc(PAGO.llave)}</button></div>`
+      : `<div class="notice" style="margin:0"><span>Envía <b>${money(monto)}</b> a la llave <b>${esc(PAGO.llave)}</b> desde Nequi o la app de tu banco (Bre-B).</span><button class="btn sm primary" data-copy="${esc(PAGO.llave)}">${ic('copy')} Copiar llave</button></div>`}
+    <span class="small muted">Revisa que aparezca <b>${esc(PAGO.titular)}</b> antes de confirmar.</span>`;
+}
+function refLink() { return acct && acct.refCode ? `${location.origin}/?ref=${acct.refCode}` : ''; }
+function shareRef() {
+  const link = refLink(); if (!link) return;
+  const t = `Yo organizo las citas médicas de mi familia con FamiliSalud: te dice por dónde pedir la cita en tu EPS, te recuerda un día antes y guarda órdenes y medicamentos. Pruébala 14 días gratis: ${link}`;
+  if (navigator.share) navigator.share({ text: t }).catch(() => {}); else copyText(t);
+}
 function openPlan() {
-  const tipoAct = acct && acct.tipo ? acct.tipo : 'familiar';
-  const est = acct ? (acct.plan === 'pago' ? `Tienes el plan ${acct.tipoNombre || 'Familiar'} activo hasta el ${fmtLong(String(acct.hasta).slice(0, 10))}.` : acct.plan === 'prueba' ? `Estás en la prueba gratis: te quedan ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}.` : 'Tu plan está vencido.') : '';
+  const est = acct ? (acct.plan === 'pago' ? `Tu plan está activo hasta el ${fmtLong(String(acct.hasta).slice(0, 10))}.` : acct.plan === 'prueba' ? `Estás en la prueba gratis: te quedan ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}.` : 'Tu plan está vencido.') : '';
   const email = acct && acct.email ? acct.email : (authUser && authUser.email) || '';
-  let sel = { plan: PLANES_UI[tipoAct] ? tipoAct : 'familiar', per: 'mensual' };
-  const msgFor = () => `Hola, ya pagué FamiliSalud plan ${PLANES_UI[sel.plan].nombre} ${sel.per}. Mi correo de cuenta es ${email}. Adjunto el comprobante.`;
+  let per = 'mensual';
+  const msgFor = () => `Hola, ya pagué FamiliSalud plan ${per}. Mi correo de cuenta es ${email}. Adjunto el comprobante.`;
   const mailFor = () => `mailto:${PAGO.correo}?subject=${encodeURIComponent('Activar plan FamiliSalud')}&body=${encodeURIComponent(msgFor())}`;
   const empresaMsg = `Hola, quiero información del plan Empresas de FamiliSalud para ofrecerlo a mis empleados. Mi correo es ${email}.`;
-  const planCard = k => { const pl = PLANES_UI[k]; return `<button class="card" data-pick="${k}" style="text-align:left;gap:4px${sel.plan === k ? ';border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset' : ''}">
-      <span class="row"><b class="grow">${pl.nombre}</b>${tipoAct === k && acct && acct.plan === 'pago' ? '<span class="badge good">Tu plan</span>' : ''}</span>
-      <span><b>${money(pl.mensual)}</b> al mes · <b>${money(pl.anual)}</b> al año</span>
-      <span class="small muted">Hasta <b>${pl.cupo} personas con acceso</b> (cada una con su correo). Personas en la familia: ilimitadas.</span></button>`; };
+  const u = acct && acct.uso, L = acct && acct.limites;
   openDialog(`${head('Tu plan')}
     <p style="margin:0">${esc(est)}</p>
-    <div style="display:grid;gap:8px" id="pl-cards">${planCard('familiar')}${planCard('plus')}</div>
-    <span class="small">Todos incluyen: asistente con IA, lectura de fotos, búsqueda de citas particulares, recordatorios, calendario conectado, guías de trámites y canales de todas las EPS. El plan anual ahorra 2 meses.</span>
+    <div class="card" style="gap:6px;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset">
+      <span class="row"><b class="grow">Plan Familiar</b>${acct && acct.plan === 'pago' ? '<span class="badge good">Activo</span>' : ''}</span>
+      <span><b style="font-size:1.2rem">${money(PLAN.mensual)}</b> al mes · <b>${money(PLAN.anual)}</b> al año <span class="small muted">(ahorras 2 meses)</span></span>
+      <span class="small"><b>Toda la familia, sin límite de personas.</b> Cada integrante puede entrar con su propio correo.</span>
+      <span class="small muted">Incluye asistente con IA, lectura de fotos, búsqueda de citas particulares, recordatorios al celular, calendario conectado, guías de trámites y canales de todas las EPS.</span>
+    </div>
+    ${u && L ? `<div class="card" style="gap:4px"><b>Uso del asistente este mes</b><span class="small">${u.asistente} de ${L.asistente} consultas · ${u.busqueda} de ${L.busqueda} búsquedas de citas particulares</span><span class="small muted">Se renueva el primer día de cada mes.</span></div>` : ''}
     ${PAGO.llave ? `<div class="card" style="gap:10px;border-color:var(--accent)">
       <b>Paga con Nequi o desde cualquier banco (Bre-B)</b>
       <div class="seg" role="group" aria-label="Periodo" id="pq-seg"><button aria-pressed="true" data-per="mensual">Mensual</button><button aria-pressed="false" data-per="anual">Anual</button></div>
       <div id="pq-box" style="display:grid;gap:10px"></div>
-      <ol style="margin:0;padding-left:1.2em;display:grid;gap:6px" class="small">
-        <li><b>Desde otro celular o computador:</b> escanea el QR con Nequi o la app de tu banco.</li>
-        <li><b>Desde este mismo celular:</b> guarda el QR y en tu app elige pagar con QR desde la galería, o envía el monto a la llave <b>${esc(PAGO.llave)}</b>.</li>
-        <li>Revisa que aparezca <b>${esc(PAGO.titular)}</b> antes de confirmar.</li>
-        <li>Si te deja mensaje, escribe tu correo${email ? `: <b style="overflow-wrap:anywhere">${esc(email)}</b>` : ''}. Envía el comprobante y activamos tu plan en menos de 24 horas hábiles.</li>
-      </ol>
+      <span class="small">Si te deja mensaje, escribe tu correo${email ? `: <b style="overflow-wrap:anywhere">${esc(email)}</b>` : ''}. Envía el comprobante y activamos tu plan en menos de 24 horas hábiles.</span>
       <div class="chips">${email ? `<button class="btn sm" data-copy="${esc(email)}">${ic('copy')} Copiar mi correo</button>` : ''}<span id="pq-send"></span></div>
     </div>` : ''}
-    <div class="card" style="gap:6px"><b>Plan Empresas</b><span class="small">Para empresas, colegios o fondos de empleados que quieren ofrecer FamiliSalud a sus trabajadores o afiliados. Precio según el número de familias, con más personas con acceso por familia.</span>
-      <span class="chips">${PAGO.whatsapp ? `<a class="btn sm primary" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(empresaMsg)}" target="_blank" rel="noopener">${ic('share')} Escríbenos por WhatsApp</a>` : ''}<a class="btn sm ${PAGO.whatsapp ? '' : 'primary'}" href="mailto:${PAGO.correo}?subject=${encodeURIComponent('Plan Empresas FamiliSalud')}&body=${encodeURIComponent(empresaMsg)}">Pedir información por correo</a></span></div>
+    ${acct && acct.refCode ? `<div class="card" style="gap:6px"><b>Invita a otra familia y gana 1 mes gratis</b><span class="small muted">Cuando una familia que invitaste activa su plan, te sumamos un mes.${acct.referidos ? ` Ya ganaste ${acct.referidos} ${acct.referidos === 1 ? 'mes' : 'meses'}.` : ''}</span><span class="chips"><button class="btn sm primary" data-ref="1">${ic('share')} Compartir mi enlace</button></span></div>` : ''}
+    <div class="card" style="gap:6px"><b>Plan Empresas</b><span class="small">Para empresas, colegios o fondos de empleados que quieren ofrecer FamiliSalud a sus trabajadores o afiliados. Precio según el número de familias.</span>
+      <span class="chips">${PAGO.whatsapp ? `<a class="btn sm" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(empresaMsg)}" target="_blank" rel="noopener">${ic('share')} WhatsApp</a>` : ''}<a class="btn sm" href="mailto:${PAGO.correo}?subject=${encodeURIComponent('Plan Empresas FamiliSalud')}&body=${encodeURIComponent(empresaMsg)}">Pedir información</a></span></div>
     <p class="small muted" style="margin:0">¿Dudas con el pago? Escribe a <span class="mono">${esc(PAGO.correo)}</span>.</p>`, r => {
     const draw = () => {
-      const pl = PLANES_UI[sel.plan], monto = pl[sel.per], qr = sel.per === 'anual' ? pl.qrAnual : pl.qrMensual;
-      r.querySelector('#pl-cards').innerHTML = planCard('familiar') + planCard('plus');
-      r.querySelectorAll('#pq-seg [data-per]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.per === sel.per)));
-      r.querySelector('#pq-box').innerHTML = `<div class="row"><span class="grow"><span class="small muted">${esc(pl.nombre)} · ${sel.per}</span><br><b style="font-size:1.35rem">${money(monto)}</b></span><button class="btn sm" data-copy="${monto}">${ic('copy')} Copiar monto</button></div>
-        ${qr ? `<img src="${esc(qr)}" alt="Código QR Bre-B para pagar ${money(monto)} a ${esc(PAGO.titular)}" style="width:min(280px,100%);justify-self:center;border-radius:16px"><div class="chips" style="justify-content:center"><a class="btn sm" href="${esc(qr)}" download="familisalud-${sel.plan}-${sel.per}.png">Guardar QR</a><button class="btn sm primary" data-copy="${esc(PAGO.llave)}">${ic('copy')} Copiar llave ${esc(PAGO.llave)}</button></div>`
-          : `<div class="notice" style="margin:0"><span>Para este plan envía <b>${money(monto)}</b> a la llave <b>${esc(PAGO.llave)}</b> desde Nequi o tu banco.</span><button class="btn sm primary" data-copy="${esc(PAGO.llave)}">${ic('copy')} Copiar llave</button></div>`}`;
+      r.querySelectorAll('#pq-seg [data-per]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.per === per)));
+      const box = r.querySelector('#pq-box'); if (!box) return;
+      box.innerHTML = payBoxHTML(PLAN[per], per === 'anual' ? PLAN.qrAnual : PLAN.qrMensual, `familisalud-${per}`);
       r.querySelector('#pq-send').innerHTML = `${PAGO.whatsapp ? `<a class="btn sm" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(msgFor())}" target="_blank" rel="noopener">${ic('share')} Comprobante por WhatsApp</a>` : ''}<a class="btn sm" href="${esc(mailFor())}">Comprobante por correo</a>`;
     };
     r.addEventListener('click', e => {
-      const pick = e.target.closest('[data-pick]'); if (pick) { sel.plan = pick.dataset.pick; draw(); return; }
-      const per = e.target.closest('[data-per]'); if (per) { sel.per = per.dataset.per; draw(); return; }
+      const pb = e.target.closest('[data-per]'); if (pb) { per = pb.dataset.per; draw(); return; }
+      if (e.target.closest('[data-ref]')) { shareRef(); return; }
       const cp = e.target.closest('[data-copy]'); if (cp) copyText(cp.dataset.copy);
     });
     draw();
+  });
+}
+
+// ---------- servicio "Te sacamos la cita" ----------
+async function loadGest() {
+  if (mode !== 'netlify') return;
+  try { const r = await fetch('/api/gestion', { credentials: 'same-origin' }); if (!r.ok) return; const j = await r.json(); gest = j.gestiones || []; gestPrecio = j.precio || gestPrecio; if (!dlg.open) render(); } catch (_) {}
+}
+async function gestPost(body) {
+  const r = await fetch('/api/gestion', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'No se pudo completar.'); return j;
+}
+function gestCardHTML(g) {
+  const [t, cls] = GEST_TXT[g.estado] || ['', ''];
+  return `<button class="card" data-gest="${esc(g.id)}" style="gap:4px;${g.estado === 'lista' && !g.agregada ? 'border-color:var(--good)' : ''}"><span class="row"><b class="grow">${esc(g.que)} · ${esc(first({ nombre: g.persona.nombre }))}</b><span class="badge ${cls}">${t}</span></span>
+    <span class="small muted">${g.estado === 'lista' && g.resultado ? `${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}${g.resultado.lugar ? ' · ' + esc(g.resultado.lugar) : ''}` : g.estado === 'pago' ? `Paga ${money(g.precio)} para que empecemos` : g.estado === 'proceso' ? 'Te avisamos apenas la tengamos' : esc(g.nota || '')}</span></button>`;
+}
+function gestListHTML() {
+  if (mode !== 'netlify') return '';
+  return `<button class="card" data-act="gestion" style="grid-template-columns:auto 1fr;column-gap:12px;align-items:center;border-color:var(--accent);text-align:left"><span class="opt-ic">${ic('check')}</span><span><b>¿Sin tiempo para llamar? Nosotros te sacamos la cita</b><br><span class="small muted">${money(gestPrecio)} por cita. Si no la conseguimos, te devolvemos el dinero.</span></span></button>`
+    + (gest.length ? `<div class="label">Citas que estamos sacando por ti</div>` + gest.map(gestCardHTML).join('') : '');
+}
+function openGestion(pre = {}) {
+  if (mode !== 'netlify') { toast('Este servicio necesita una cuenta.'); return; }
+  if (!S.miembros.length) { openMember(); return; }
+  if (rol === 'lector') { toast('Tienes acceso solo para ver. Pide a quien administra la familia que haga la solicitud.'); return; }
+  let mid = pre.miembroId || S.miembros[0].id, foto = null;
+  const tel = (() => { try { return localStorage.getItem('fs-tel') || ''; } catch (_) { return ''; } })();
+  const falta = m => !m || !m.doc || !m.eps;
+  const draw = (keep = {}) => {
+    const m = member(mid);
+    openDialog(`${head('Te sacamos la cita')}
+      <p class="small" style="margin:0">Nuestro equipo pide la cita a la EPS por ti, por sus canales oficiales. Cuando la tengamos te avisamos y la agregas a tu agenda con un toque. <b>Valor: ${money(gestPrecio)}</b> por cita. Si no la conseguimos, te devolvemos el dinero.</p>
+      <form id="gs-f" class="fields">
+        <label class="f">¿Para quién?<select id="gs-m">${memberOptions(mid)}</select></label>
+        <label class="f">¿Qué cita necesita?<input id="gs-que" required value="${esc(keep.que ?? pre.que ?? '')}" placeholder="Ej.: Medicina general, Pediatría, Ortopedia"></label>
+        ${falta(m) ? `<div class="notice full" style="margin:0"><span>A ${esc(first(m))} le falta ${!m.doc && !m.eps ? 'el documento y la EPS' : !m.doc ? 'el número de documento' : 'la EPS'}. Lo necesitamos para pedir la cita.</span><button class="btn sm primary" type="button" id="gs-edit">Completar</button></div>`
+          : `<p class="small muted full" style="margin:0">${esc(m.nombre)} · ${esc(docLabel(m))} · ${esc(m.eps)}${m.regimen ? ' (' + esc(m.regimen) + ')' : ''}</p>`}
+        <label class="f">Ciudad o sede que prefieres<input id="gs-ciudad" value="${esc(keep.ciudad ?? (S.familia && S.familia.ciudad) ?? '')}" placeholder="Ej.: Armenia, sede norte"></label>
+        <label class="f">¿Cuándo puede ir?<input id="gs-disp" value="${esc(keep.disp || '')}" placeholder="Ej.: mañanas entre semana, cualquier día"></label>
+        <label class="f">Celular de contacto (WhatsApp)<input id="gs-tel" required inputmode="tel" value="${esc(keep.tel ?? tel)}" placeholder="300 123 4567"></label>
+        <label class="f full">Foto de la orden médica o autorización (si la tiene)<input type="file" id="gs-foto" accept="image/*"></label>
+        <label class="f full">Algo más que debamos saber (opcional)<textarea id="gs-notas" placeholder="Ej.: es control de un examen, prefiere doctora, la EPS dice que no hay agenda…">${esc(keep.notas || '')}</textarea></label>
+        <label class="row full small" style="gap:8px;align-items:flex-start"><input type="checkbox" id="gs-ok" style="margin-top:3px"><span>Autorizo a Emnova (FamiliSalud) a usar estos datos para pedir la cita a la EPS en nombre de esta persona, según la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a>.</span></label>
+        <div class="dlg-foot full"><button class="btn" type="button" id="gs-x">Cancelar</button><button class="btn primary" type="submit" ${falta(m) ? 'disabled' : ''}>Pedir que me la saquen</button></div>
+      </form>`, r => {
+      const keepNow = () => ({ que: val(r, 'gs-que'), ciudad: val(r, 'gs-ciudad'), disp: val(r, 'gs-disp'), tel: val(r, 'gs-tel'), notas: val(r, 'gs-notas') });
+      r.querySelector('#gs-m').onchange = e => { const k = keepNow(); mid = e.target.value; draw(k); };
+      r.querySelector('#gs-x').onclick = () => dlg.close();
+      r.querySelector('#gs-edit')?.addEventListener('click', () => openMember(mid));
+      r.querySelector('#gs-foto').onchange = async e => { const f = e.target.files[0]; foto = null; if (!f) return; try { foto = await shrinkImage(f, 1400); } catch (_) { toast('No se pudo leer la foto.'); } };
+      r.querySelector('#gs-f').onsubmit = async e => {
+        e.preventDefault();
+        if (!r.querySelector('#gs-ok').checked) { toast('Marca la autorización para continuar.'); return; }
+        const m = member(mid), btn = r.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Enviando…';
+        try { localStorage.setItem('fs-tel', val(r, 'gs-tel')); } catch (_) {}
+        try {
+          const j = await gestPost({ accion: 'crear', persona: { id: m.id, nombre: m.nombre, tipoDoc: m.tipoDoc || 'CC', doc: m.doc, eps: m.eps, regimen: m.regimen || '', nac: m.nac || '' }, que: val(r, 'gs-que'), ciudad: val(r, 'gs-ciudad'), disponibilidad: val(r, 'gs-disp'), telefono: val(r, 'gs-tel'), notas: val(r, 'gs-notas'), autoriza: true, foto });
+          gest.unshift(j.gestion); openGestDetail(j.gestion.id, true);
+        } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = 'Pedir que me la saquen'; }
+      };
+    });
+  };
+  draw();
+}
+function openGestDetail(id, nueva) {
+  const g = gest.find(x => x.id === id); if (!g) return;
+  const [t, cls] = GEST_TXT[g.estado];
+  const email = acct && acct.email || '';
+  const msg = `Hola, pagué ${money(g.precio)} para que FamiliSalud me saque la cita de ${g.que} para ${g.persona.nombre}. Mi correo es ${email}. Adjunto el comprobante.`;
+  openDialog(`${head(nueva ? '¡Solicitud enviada!' : 'Cita que sacamos por ti')}
+    <div class="card" style="gap:4px"><span class="row"><b class="grow">${esc(g.que)}</b><span class="badge ${cls}">${t}</span></span><span class="small muted">${esc(g.persona.nombre)} · ${esc(g.persona.eps)} · pedida el ${fmtDate(g.creada.slice(0, 10))}</span></div>
+    ${g.estado === 'pago' ? `<p style="margin:0">Para empezar a gestionarla, paga <b>${money(g.precio)}</b>. Apenas veamos el pago te avisamos y empezamos.</p>
+      <div class="card" style="gap:10px;border-color:var(--accent)">${payBoxHTML(g.precio, PLAN.qrGestion, 'familisalud-cita')}<span class="chips">${PAGO.whatsapp ? `<a class="btn sm" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('share')} Comprobante por WhatsApp</a>` : ''}<a class="btn sm" href="mailto:${PAGO.correo}?subject=${encodeURIComponent('Pago cita FamiliSalud')}&body=${encodeURIComponent(msg)}">Comprobante por correo</a></span></div>
+      <div class="dlg-foot"><button class="btn danger" id="gd-cancel">Cancelar solicitud</button><button class="btn primary" id="gd-ok">Listo</button></div>`
+    : g.estado === 'proceso' ? `<p style="margin:0">Recibimos tu pago y estamos pidiendo la cita a la EPS. Te llega una notificación cuando la tengamos${pushState.on ? '' : ' (activa los recordatorios en Familia > Ajustes para recibirla)'}.</p><div class="dlg-foot"><button class="btn primary" id="gd-ok">Entendido</button></div>`
+    : g.estado === 'lista' ? `<div class="answer" style="margin:0"><b style="color:var(--good)">${ic('check')} ${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}</b>${g.resultado.lugar ? `<p style="margin:4px 0 0">${esc(g.resultado.lugar)}</p>` : ''}${g.resultado.notas ? `<p class="small" style="margin:4px 0 0">${esc(g.resultado.notas)}</p>` : ''}</div>
+      <div class="dlg-foot">${g.agregada ? '<button class="btn" id="gd-hide">Quitar de la lista</button>' : ''}<button class="btn primary" id="gd-add">${g.agregada ? 'Ya está en tu agenda' : ic('plus') + ' Agregar a mi agenda'}</button></div>`
+    : `<p style="margin:0">${esc(g.nota || 'No fue posible conseguir la cita.')}</p><p class="small muted" style="margin:0">Te devolvemos el dinero a la misma cuenta desde la que pagaste.</p><div class="dlg-foot"><button class="btn" id="gd-hide">Quitar de la lista</button><button class="btn primary" id="gd-self">Pedirla yo mismo</button></div>`}`, r => {
+    r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
+    r.querySelector('#gd-ok')?.addEventListener('click', () => { dlg.close(); if (nueva) { view = 'salud'; salud = 'tramites'; render(); } });
+    r.querySelector('#gd-cancel')?.addEventListener('click', () => openConfirm('¿Cancelar la solicitud?', 'Si ya pagaste, escríbenos antes de cancelar.', 'Cancelar solicitud', async () => { try { await gestPost({ accion: 'cancelar', id: g.id }); gest = gest.filter(x => x.id !== g.id); render(); toast('Solicitud cancelada'); } catch (e) { toast(e.message); } }));
+    r.querySelector('#gd-hide')?.addEventListener('click', async () => { try { await gestPost({ accion: 'ocultar', id: g.id }); gest = gest.filter(x => x.id !== g.id); dlg.close(); render(); } catch (e) { toast(e.message); } });
+    r.querySelector('#gd-self')?.addEventListener('click', () => openPedir({ miembroId: g.persona.id, que: g.que }));
+    r.querySelector('#gd-add')?.addEventListener('click', () => {
+      if (g.agregada) { dlg.close(); return; }
+      const mid = member(g.persona.id) ? g.persona.id : (S.miembros.find(m => m.nombre === g.persona.nombre) || S.miembros[0]).id;
+      openCitaForm({ miembroId: mid, especialidad: g.que, fecha: g.resultado.fecha, hora: g.resultado.hora || '', lugar: g.resultado.lugar || '', notas: g.resultado.notas || '', gestionId: g.id });
+    });
   });
 }
 function openCalendar() {
@@ -1319,10 +1427,10 @@ async function openAdmin() {
   const estado = c => c.plan === 'pago' ? `Pagado hasta el ${fmtDate(String(c.hasta).slice(0, 10))} (${c.dias} días)` : c.plan === 'prueba' ? `Prueba gratis: quedan ${c.dias} días (hasta ${fmtDate(String(c.hasta).slice(0, 10))})` : 'Vencido: no puede guardar cambios';
   const last = {}; let filt = '';
   const card = c => `<div class="card" style="gap:8px${last[c.userId] ? ';border-color:var(--good)' : ''}" id="adc-${esc(c.userId)}"><div class="row"><span class="grow"><b style="overflow-wrap:anywhere">${esc(c.email || c.userId)}</b><br><span class="small muted">Cuenta creada el ${fmtDate(c.creada.slice(0, 10))}</span></span><span class="badge ${c.plan === 'pago' ? 'good' : c.plan === 'prueba' ? 'accent' : 'crit'}">${c.plan === 'pago' ? 'Pagando' : c.plan === 'prueba' ? 'Prueba' : 'Vencido'}</span></div>
-      <span class="small"><b>${esc(estado(c))}</b><br>Plan ${esc(c.tipoNombre || 'Familiar')} · ${c.cupo || 4} personas con acceso${c.borraEl ? ` · <span style="color:var(--crit)">se borra el ${fmtDate(String(c.borraEl).slice(0, 10))}</span>` : ''}</span>
+      <span class="small"><b>${esc(estado(c))}</b><br>Plan ${esc(c.tipoNombre || 'Familiar')}${c.tipo === 'empresa' ? ` · ${c.cupo} personas con acceso` : ''}${c.invitadoPor ? ` · invitado por ${esc(c.invitadoPor)}` : ''}${c.referidos ? ` · trajo ${c.referidos} ${c.referidos === 1 ? 'familia' : 'familias'}` : ''}${c.borraEl ? ` · <span style="color:var(--crit)">se borra el ${fmtDate(String(c.borraEl).slice(0, 10))}</span>` : ''}</span>
       ${last[c.userId] ? `<div class="notice" style="margin:0"><span>✓ ${esc(last[c.userId].msg)}</span><button class="btn sm" data-undo="${esc(c.userId)}">Deshacer</button></div>` : ''}
       <div class="chips"><button class="btn sm primary" data-ad="mes" data-u="${esc(c.userId)}">+1 mes</button><button class="btn sm" data-ad="anio" data-u="${esc(c.userId)}">+1 año</button><button class="btn sm" data-ad="prueba7" data-u="${esc(c.userId)}">+7 días de prueba</button>${c.plan === 'pago' ? `<button class="btn sm danger" data-ad="quitar" data-u="${esc(c.userId)}">Quitar plan</button>` : ''}</div>
-      <div class="chips"><span class="small muted">Tipo:</span>${[['familiar', 'Familiar (4)'], ['plus', 'Plus (8)']].map(([t, l]) => `<button class="btn sm" data-tipo="${t}" data-u="${esc(c.userId)}" aria-pressed="${(c.tipo || 'familiar') === t}">${l}</button>`).join('')}<input type="number" min="1" max="200" inputmode="numeric" aria-label="Personas con acceso (Empresa)" id="adn-${esc(c.userId)}" value="${c.tipo === 'empresa' ? c.cupo : 12}" style="width:4.5em"><button class="btn sm" data-tipo="empresa" data-u="${esc(c.userId)}" aria-pressed="${c.tipo === 'empresa'}">Empresa</button></div></div>`;
+      <div class="chips"><span class="small muted">Tipo:</span><button class="btn sm" data-tipo="familiar" data-u="${esc(c.userId)}" aria-pressed="${c.tipo !== 'empresa'}">Familiar</button><input type="number" min="1" max="200" inputmode="numeric" aria-label="Personas con acceso (Empresa)" id="adn-${esc(c.userId)}" value="${c.tipo === 'empresa' ? c.cupo : 30}" style="width:4.5em"><button class="btn sm" data-tipo="empresa" data-u="${esc(c.userId)}" aria-pressed="${c.tipo === 'empresa'}">Empresa</button></div></div>`;
   const list = () => j.cuentas.filter(c => !filt || (c.email || '').toLowerCase().includes(filt.toLowerCase())).slice(0, 80).map(card).join('') || '<span class="muted">Sin resultados.</span>';
   const stats = () => `<div><b>${j.total}</b><span class="small muted">cuentas</span></div><div><b>${j.prueba}</b><span class="small muted">en prueba</span></div><div><b>${j.pagos}</b><span class="small muted">pagando</span></div>`;
   const send = async (userId, body) => {
@@ -1333,9 +1441,13 @@ async function openAdmin() {
   };
   openDialog(`${head('Administración')}
     <div class="feat" id="ad-stats" style="grid-template-columns:repeat(3,minmax(0,1fr))">${stats()}</div>
-    <p class="small muted" style="margin:0">Activa el plan solo cuando veas el pago en tu cuenta de Mercado Pago o Nequi. Cada cambio se guarda al instante y el cliente lo ve al volver a abrir la app.</p>
+    <div class="seg" role="group" aria-label="Sección" id="ad-seg"><button aria-pressed="true" data-tab="c">Clientes</button><button aria-pressed="false" data-tab="g">Citas por sacar <span id="ad-gn"></span></button></div>
+    <div id="ad-tc" style="display:grid;gap:12px">
+    <p class="small muted" style="margin:0">Activa el plan solo cuando veas el pago en tu Nequi. Cada cambio se guarda al instante y el cliente lo ve al volver a abrir la app. Al activar el primer pago de una familia invitada, quien la invitó gana 1 mes automáticamente.</p>
     <label class="f">Buscar por correo<input id="ad-q" inputmode="email" autocomplete="off"></label>
-    <div style="display:grid;gap:8px" id="ad-list">${list()}</div>`, r => {
+    <div style="display:grid;gap:8px" id="ad-list">${list()}</div></div>
+    <div id="ad-tg" style="display:none;gap:8px"><p class="muted" style="margin:0">Cargando…</p></div>`, r => {
+    adminGestiones(r);
     const box = r.querySelector('#ad-list');
     const redraw = () => { box.innerHTML = list(); r.querySelector('#ad-stats').innerHTML = stats(); };
     r.querySelector('#ad-q').oninput = e => { filt = e.target.value.trim(); redraw(); };
@@ -1345,7 +1457,7 @@ async function openAdmin() {
       box.querySelectorAll('button').forEach(x => x.disabled = true); const old = b.textContent; b.textContent = 'Guardando…';
       try {
         if (b.dataset.undo) { const pv = last[u].prev; await (pv.tipo ? send(u, { accion: 'plan', tipo: pv.tipo, cupo: pv.cupo }) : send(u, { accion: 'restaurar', pagoHasta: pv.pagoHasta ?? null, trialHasta: pv.trialHasta })); delete last[u]; toast('Cambio deshecho'); }
-        else if (b.dataset.tipo) { const prev = { tipo: c.tipo || 'familiar', cupo: c.cupo || 4 }; const n = b.dataset.tipo === 'empresa' ? Number((document.getElementById('adn-' + u) || {}).value) : undefined; const nc = await send(u, { accion: 'plan', tipo: b.dataset.tipo, cupo: n }); last[u] = { prev, msg: `Plan cambiado a ${nc.tipoNombre} (${nc.cupo} personas con acceso).` }; toast('Guardado'); }
+        else if (b.dataset.tipo) { const prev = { tipo: c.tipo || 'familiar', cupo: c.cupo || 30 }; const n = b.dataset.tipo === 'empresa' ? Number((document.getElementById('adn-' + u) || {}).value) : undefined; const nc = await send(u, { accion: 'plan', tipo: b.dataset.tipo, cupo: n }); last[u] = { prev, msg: `Plan cambiado a ${nc.tipoNombre}${nc.tipo === 'empresa' ? ` (${nc.cupo} personas con acceso)` : ''}.` }; toast('Guardado'); }
         else { const prev = { pagoHasta: c.pagoHasta ?? null, trialHasta: c.trialHasta }; const nc = await send(u, { accion: b.dataset.ad }); last[u] = { prev, msg: `${ACC[b.dataset.ad]}. Ahora: ${estado(nc)}.` }; toast('Guardado'); }
       } catch (err) { toast(err.message || 'No se pudo guardar.'); b.textContent = old; }
       redraw(); const el = document.getElementById('adc-' + u); if (el) el.scrollIntoView({ block: 'nearest' });
@@ -1354,14 +1466,45 @@ async function openAdmin() {
   dlg.addEventListener('close', () => refreshCloud(true), { once: true });
 }
 
+function adminGestiones(r) {
+  let G = [], abierto = null;
+  const box = r.querySelector('#ad-tg');
+  r.querySelector('#ad-seg').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; r.querySelectorAll('#ad-seg [data-tab]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); r.querySelector('#ad-tc').style.display = b.dataset.tab === 'c' ? 'grid' : 'none'; box.style.display = b.dataset.tab === 'g' ? 'grid' : 'none'; });
+  const datos = g => `${g.persona.nombre}\n${g.persona.tipoDoc} ${g.persona.doc}\nEPS: ${g.persona.eps}${g.persona.regimen ? ' (' + g.persona.regimen + ')' : ''}${g.persona.nac ? '\nNacimiento: ' + g.persona.nac : ''}\nCita: ${g.que}\nCiudad/sede: ${g.ciudad || '—'}\nDisponibilidad: ${g.disponibilidad || '—'}\nContacto: ${g.telefono}${g.notas ? '\nNotas: ' + g.notas : ''}`;
+  const card = g => { const [t, cls] = GEST_TXT[g.estado]; const tel = g.telefono.replace(/\D/g, ''); const wa = tel.length === 10 ? '57' + tel : tel;
+    return `<div class="card" style="gap:8px" data-gk="${esc(g.famId)}|${esc(g.id)}"><div class="row"><b class="grow">${esc(g.que)} · ${esc(g.persona.nombre)}</b><span class="badge ${cls}">${t}</span></div>
+      <span class="small" style="white-space:pre-line">${esc(datos(g))}\nCuenta: ${esc(g.email)} · pedida el ${fmtDate(g.creada.slice(0, 10))} · ${money(g.precio)}</span>
+      ${g.resultado && g.estado === 'lista' ? `<span class="small"><b>Asignada:</b> ${fmtLong(g.resultado.fecha)} ${g.resultado.hora ? fmtHora(g.resultado.hora) : ''} · ${esc(g.resultado.lugar || '')}</span>` : ''}
+      <div class="chips"><button class="btn sm" data-g="copiar">${ic('copy')} Copiar datos</button>${g.tieneFoto && g.estado !== 'lista' && g.estado !== 'no' ? '<button class="btn sm" data-g="foto">Ver orden</button>' : ''}<a class="btn sm" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a><a class="btn sm" href="tel:${esc(g.telefono)}">Llamar</a></div>
+      <div class="chips">${g.estado === 'pago' ? '<button class="btn sm primary" data-g="proceso">Pago recibido: empezar</button>' : ''}${g.estado === 'proceso' || g.estado === 'pago' ? '<button class="btn sm primary" data-g="abrir-lista">Cita conseguida</button><button class="btn sm danger" data-g="abrir-no">No se pudo</button>' : ''}</div>
+      ${abierto === g.id + 'lista' ? `<div class="fields"><label class="f">Fecha<input type="date" id="ag-fecha"></label><label class="f">Hora<input type="time" id="ag-hora"></label><label class="f full">Lugar<input id="ag-lugar" placeholder="Clínica, sede y consultorio"></label><label class="f full">Notas para la familia<input id="ag-notas" placeholder="Ej.: llegar 20 min antes con la orden"></label><button class="btn primary full" data-g="lista">Guardar y avisar a la familia</button></div>` : ''}
+      ${abierto === g.id + 'no' ? `<div class="fields"><label class="f full">Mensaje para la familia<textarea id="ag-nota">No fue posible conseguir la cita porque la EPS no tiene agenda disponible. Te devolvemos el dinero.</textarea></label><button class="btn danger full" data-g="no">Guardar y avisar</button></div>` : ''}
+    </div>`; };
+  const draw = () => { const n = G.filter(g => g.estado === 'pago' || g.estado === 'proceso').length; r.querySelector('#ad-gn').textContent = n ? `(${n})` : ''; box.innerHTML = G.length ? G.map(card).join('') : '<span class="muted">Aún no hay solicitudes.</span>'; };
+  const post = async (g, body) => { const res = await fetch('/api/gestion?admin=1', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(Object.assign({ famId: g.famId, id: g.id }, body)) }); const k = await res.json().catch(() => ({})); if (!res.ok) throw new Error(k.error || 'No se pudo guardar.'); Object.assign(g, k.gestion); };
+  box.addEventListener('click', async e => {
+    const b = e.target.closest('[data-g]'); if (!b) return; const [famId, id] = b.closest('[data-gk]').dataset.gk.split('|'); const g = G.find(x => x.id === id && x.famId === famId); const a = b.dataset.g;
+    if (a === 'copiar') { copyText(datos(g)); return; }
+    if (a === 'foto') { try { const res = await fetch(`/api/gestion?admin=1&foto=${encodeURIComponent(famId + '/' + id)}`, { credentials: 'same-origin' }); const f = await res.json(); if (!res.ok) throw new Error(f.error); const bin = atob(f.data), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); window.open(URL.createObjectURL(new Blob([arr], { type: f.media_type })), '_blank'); } catch (err) { toast(err.message || 'No se pudo abrir la foto.'); } return; }
+    if (a === 'abrir-lista' || a === 'abrir-no') { abierto = abierto === id + a.slice(6) ? null : id + a.slice(6); draw(); return; }
+    b.disabled = true; const old = b.textContent; b.textContent = 'Guardando…';
+    try {
+      if (a === 'proceso') await post(g, { estado: 'proceso' });
+      if (a === 'lista') { const c = b.closest('.card'); await post(g, { estado: 'lista', resultado: { fecha: c.querySelector('#ag-fecha').value, hora: c.querySelector('#ag-hora').value, lugar: c.querySelector('#ag-lugar').value, notas: c.querySelector('#ag-notas').value } }); }
+      if (a === 'no') { const c = b.closest('.card'); await post(g, { estado: 'no', nota: c.querySelector('#ag-nota').value }); }
+      abierto = null; toast('Guardado. Le avisamos a la familia.');
+    } catch (err) { toast(err.message); b.textContent = old; b.disabled = false; return; }
+    draw();
+  });
+  fetch('/api/gestion?admin=1', { credentials: 'same-origin' }).then(x => x.json()).then(j => { G = j.gestiones || []; draw(); }).catch(() => { box.innerHTML = '<span class="muted">No se pudieron cargar las solicitudes.</span>'; });
+}
+
 // ---------- acceso familiar ----------
 const ROL_TXT = { admin: 'Administra', editor: 'Puede editar', lector: 'Solo ver' };
 function accessHTML() {
   const f = famInfo, admin = rol === 'admin';
   return `<div class="sec"><div class="sec-head"><h2>Quién tiene acceso</h2>${admin ? `<button class="btn primary sm" data-act="invite">${ic('plus')} Invitar</button>` : ''}</div>
-    <p class="small muted" style="margin:0">Cada integrante entra con su propio correo y ve la misma agenda. ${admin ? 'Tú decides quién puede editar y quién solo puede ver.' : ''}</p>
-    <span class="small"><b>${usados()} de ${cupoActual()}</b> personas con acceso en tu plan ${esc((acct && acct.tipoNombre) || 'Familiar')}.</span>
-    ${admin && usados() >= cupoActual() ? `<div class="notice" style="margin:0"><span>Llegaste al límite de tu plan. Para invitar a más personas, pasa al plan Familiar Plus (8 personas).</span><button class="btn sm primary" data-act="plan">Ver planes</button></div>` : ''}
+    <p class="small muted" style="margin:0">Invita a todos los que quieras: cada integrante entra con su propio correo y ve la misma agenda. ${admin ? 'Tú decides quién puede editar y quién solo puede ver.' : ''}</p>
     ${f.miembros.map(m => `<${admin && !m.dueno && !m.yo ? `button class="card" data-acc="${esc(m.userId)}"` : 'div class="card"'}><span class="row"><b class="grow" style="overflow-wrap:anywhere">${esc(m.email)}${m.yo ? ' (tú)' : ''}</b><span class="badge ${m.rol === 'admin' ? 'accent' : m.rol === 'lector' ? '' : 'good'}">${m.dueno ? 'Creó la familia' : ROL_TXT[m.rol]}</span></span></${admin && !m.dueno && !m.yo ? 'button' : 'div'}>`).join('')}
     ${f.invitaciones.length ? `<div class="label">Invitaciones pendientes</div>` + f.invitaciones.map(i => `<div class="card"><span class="row"><b class="grow" style="overflow-wrap:anywhere">${esc(i.email)}</b><span class="badge warn">${ROL_TXT[i.rol]} · pendiente</span></span>${admin ? `<span class="chips"><button class="btn sm" data-inv-share="${esc(i.email)}">${ic('share')} Enviar aviso</button><button class="btn sm danger" data-inv-cancel="${esc(i.email)}">Cancelar</button></span>` : ''}</div>`).join('') : ''}
     ${!f.esDueno ? '<button class="btn ghost sm danger" data-act="leave" style="width:fit-content">Salir de esta familia</button>' : ''}
@@ -1371,7 +1514,7 @@ async function famAction(body, okMsg) {
   try {
     const r = await fetch('/api/family', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok && j.code === 'cupo') { toast(j.error); openPlan(); return null; }
+    if (!r.ok && j.code === 'cupo') { toast(j.error); return null; }
     if (!r.ok) throw new Error(j.error || 'No se pudo completar.');
     if (dlg.open) dlg.close();
     if (['aceptar', 'rechazar', 'salir'].includes(body.accion)) { toast(okMsg); invitacion = null; await loadCloud(); return j; }
@@ -1379,7 +1522,6 @@ async function famAction(body, okMsg) {
   } catch (e) { toast(e.message || 'No se pudo completar.'); return null; }
 }
 function openInvite() {
-  if (usados() >= cupoActual()) { toast(`Tu plan permite ${cupoActual()} personas con acceso. Pasa a un plan más grande para invitar a más.`); openPlan(); return; }
   openDialog(`${head('Invitar a un integrante')}
     <p class="muted" style="margin:0">Escribe el correo con el que esa persona va a entrar (o su cuenta de Google). Le llegará la invitación al iniciar sesión.</p>
     <form id="iv-f" style="display:grid;gap:12px">
@@ -1599,6 +1741,7 @@ function openPlus() {
   const opt = (id, icon, t, sub, primary) => `<button class="card" id="${id}" style="grid-template-columns:auto 1fr;column-gap:14px;align-items:center${primary ? ';border-color:var(--accent)' : ''}"><span class="opt-ic">${ic(icon)}</span><span><b>${t}</b><br><span class="small muted">${sub}</span></span></button>`;
   openDialog(`${head('¿Qué necesitas hacer?')}
     ${opt('pl-pedir', 'cal', 'Pedir una cita', 'Te mostramos cómo pedirla en tu EPS y qué decir.', true)}
+    ${mode === 'netlify' ? opt('pl-gest', 'check', 'Que FamiliSalud me saque la cita', `Nosotros la pedimos a la EPS por ti. ${money(gestPrecio)}.`) : ''}
     ${opt('pl-part', 'spark', 'Buscar una cita particular', 'Opciones con precio y calificaciones, y cómo verificar al médico.')}
     ${opt('pl-cita', 'check', 'Ya tengo una cita: guardarla', 'Fecha, hora, lugar y qué llevar.')}
     ${photoOn() ? opt('pl-foto', 'doc', 'Leer una foto o mensaje de la EPS', 'Toma foto a la orden o pega el SMS y llenamos la cita.') : ''}
@@ -1607,6 +1750,7 @@ function openPlus() {
     ${opt('pl-ctl', 'pulse', 'Anotar un control', '“Control en 3 meses”: te avisamos cuándo pedirlo.')}
     ${opt('pl-med', 'pill', 'Anotar un medicamento', 'Te recordamos la próxima entrega.')}`, r => {
     r.querySelector('#pl-pedir').onclick = () => openPedir({});
+    r.querySelector('#pl-gest')?.addEventListener('click', () => openGestion({}));
     r.querySelector('#pl-cita').onclick = () => openCitaForm();
     r.querySelector('#pl-foto')?.addEventListener('click', () => openCitaForm({ photo: true }));
     r.querySelector('#pl-aut').onclick = () => openAut();
@@ -1643,6 +1787,7 @@ function openPedir(pre = {}) {
       <div class="fields"><label class="f">¿Para quién?<select id="pd-m">${memberOptions(mid)}</select></label><label class="f">¿Qué cita?<input id="pd-que" value="${esc(que)}" placeholder="Ej.: Medicina general"></label></div>
       ${channelsHTML(m, que, pre)}
       <div class="answer" style="margin:0"><b style="color:var(--ai)">Qué decir</b><p id="pd-script">${esc(scriptFor(m, que, pre))}</p><div class="row"><span class="small muted grow">Ten a mano el documento${pre.numero ? ' y la autorización' : ''}.</span><button class="btn sm" id="pd-copy">${ic('copy')} Copiar</button></div></div>
+      ${mode === 'netlify' ? `<button class="card" id="pd-gest" style="grid-template-columns:auto 1fr;column-gap:12px;align-items:center;border-color:var(--accent);text-align:left"><span class="opt-ic">${ic('check')}</span><span><b>¿Sin tiempo para llamar? Nosotros te la sacamos</b><br><span class="small muted">${money(gestPrecio)}. Te avisamos cuando esté lista. Si no la conseguimos, te devolvemos el dinero.</span></span></button>` : ''}
       <button class="card" id="pd-part" style="grid-template-columns:auto 1fr;column-gap:12px;align-items:center;border-color:var(--accent);text-align:left"><span class="opt-ic">${ic('spark')}</span><span><b>¿La EPS demora mucho? Busca una cita particular</b><br><span class="small muted">Opciones reales con precio, calificación y teléfono.</span></span></button>
       <div class="dlg-foot"><button class="btn" id="pd-wait">Quedó pendiente</button><button class="btn primary" id="pd-got">${ic('check')} Ya me dieron la cita</button></div>`, r => {
       r.querySelector('#pd-m').onchange = e => { mid = e.target.value; draw(); };
@@ -1650,6 +1795,7 @@ function openPedir(pre = {}) {
       r.querySelectorAll('[data-ch]').forEach(a => a.addEventListener('click', () => { lastCh = a.dataset.ch; }));
       r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
       r.querySelector('#pd-copy').onclick = () => copyText(r.querySelector('#pd-script').textContent);
+      r.querySelector('#pd-gest')?.addEventListener('click', () => openGestion({ miembroId: mid, que: val(r, 'pd-que') }));
       r.querySelector('#pd-part').onclick = () => openParticular({ miembroId: mid, especialidad: val(r, 'pd-que') });
       r.querySelector('#pd-got').onclick = () => openCitaForm({ miembroId: mid, especialidad: val(r, 'pd-que') || pre.especialidad || '', controlId: pre.controlId, autId: pre.autId, fecha: addDays(todayISO(), 1) });
       r.querySelector('#pd-wait').onclick = () => {

@@ -2,7 +2,7 @@
 // Usa Netlify AI Gateway: no necesita clave propia; consume créditos de la cuenta de Netlify.
 import Anthropic from "@anthropic-ai/sdk";
 import type { Config } from "@netlify/functions";
-import { requireUser, getCuenta, estadoCuenta, stores, json, AI_DAILY_LIMIT, resolveFamily } from "../../lib/common.mts";
+import { requireUser, getCuenta, estadoCuenta, stores, json, AI_DAILY_LIMIT, resolveFamily, gastarUso, USO_MES } from "../../lib/common.mts";
 
 const MODEL = "claude-haiku-5-5";
 const TIPOS = "medica, odonto, examen, imagen, terapia, vacuna, colegio, tramite, otra";
@@ -17,7 +17,9 @@ Cómo funciona la app:
 - Leer foto: en Nueva cita, "Leer mensaje o foto de la EPS" permite subir la foto de la orden o pegar el SMS.
 - Familia: personas con su EPS, documento y alergias. Ajustes: tu cuenta y plan, conectar tu calendario (enlace de suscripción), exportar a Google Sheets (archivo CSV), copia de seguridad, privacidad, cerrar sesión, borrar datos.
 - Conectar calendario: Ajustes > Conectar mi calendario > copiar enlace. En Google Calendar (computador): Otros calendarios > + > Desde URL > pegar. En iPhone: Ajustes > Calendario > Cuentas > Añadir cuenta > Otra > Añadir calendario suscrito. Google puede tardar varias horas en mostrar cambios.
-- Planes: 14 días gratis. Familiar (hasta 4 personas con acceso con su propio correo): $9.900 COP al mes o $99.000 al año. Familiar Plus (hasta 8 personas con acceso): $14.900 al mes o $149.000 al año. Integrantes registrados en la agenda: ilimitados en todos los planes. Plan Empresas a la medida (se pide desde Ajustes > Tu plan). Se paga por Nequi o Bre-B con QR o llave. Si vence, puedes ver y exportar tus datos pero no guardar cambios. Si lleva 12 meses vencido, se avisa y 30 días después se borra la información de la familia.
+- Plan: 14 días gratis. Plan Familiar: $14.900 COP al mes o $149.000 al año, con personas ilimitadas (todos los integrantes y todos los que entran con su correo). Incluye uso justo del asistente: 150 consultas y 15 búsquedas de citas particulares al mes por familia. Plan Empresas a la medida (se pide desde Ajustes > Tu plan).
+- Invita y gana: en Ajustes > Invita a otra familia hay un enlace propio; cuando una familia que invitaste paga su plan, ganas 1 mes gratis.
+- Te sacamos la cita: botón + > "Que FamiliSalud me saque la cita" (o desde Pedir una cita). Llenas para quién y qué cita, pagas $19.900 por Nequi o Bre-B y nuestro equipo la gestiona con la EPS; te avisamos cuando esté lista y la agregas a la agenda con un toque. Si no se logra, te devolvemos el dinero. Se ve en Salud > Trámites. Se paga por Nequi o Bre-B con QR o llave. Si vence, puedes ver y exportar tus datos pero no guardar cambios. Si lleva 12 meses vencido, se avisa y 30 días después se borra la información de la familia.
 - Privacidad: los datos se guardan cifrados en Netlify, solo tú los ves con tu cuenta. Responsable: Emnova (emanuelrendoncarmona@gmail.com).
 - Acceso familiar: en Familia > Quién tiene acceso, quien administra invita a cada integrante con su correo (puede editar o solo ver). La persona crea su cuenta con ese mismo correo y acepta la invitación. Todos ven la misma agenda.
 - Citas particulares: botón + > Buscar cita particular. Busca opciones con precio y calificaciones, y enlaces para verificar al médico en ReTHUS y a la clínica en REPS.
@@ -55,6 +57,8 @@ export default async (req: Request) => {
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Solicitud inválida." }, 400); }
   const mode = body.mode;
+  const tipoUso = mode === "particular" ? "busqueda" : "asistente";
+  if (!(await gastarUso(fam.id, tipoUso))) return json({ error: tipoUso === "busqueda" ? `Tu familia ya usó las ${USO_MES.busqueda} búsquedas de citas particulares de este mes. El otro mes se renuevan.` : `Tu familia ya usó las ${USO_MES.asistente} consultas al asistente de este mes. El otro mes se renuevan; mientras tanto puedes llenar los formularios a mano.`, code: "limite_mes" }, 429);
   const hoy = String(body.hoy || new Date().toISOString().slice(0, 10)).slice(0, 30);
   const anthropic = new Anthropic();
 

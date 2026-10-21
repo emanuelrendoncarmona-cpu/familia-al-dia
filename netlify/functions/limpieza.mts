@@ -50,6 +50,8 @@ export default async () => {
       for (const inv of fam.invitaciones || []) await famStores.invites().delete(emailKey(inv.email));
       await famStores.familias().delete(c.userId);
     }
+    const gs = stores.gestiones();
+    for (const pre of [`g/${c.userId}/`, `foto/${c.userId}/`]) { const { blobs } = await gs.list({ prefix: pre }); for (const b of blobs) await gs.delete(b.key); }
     c.borrado = new Date(now).toISOString();
     await cuentas.setJSON(key, c); borrados++;
   }

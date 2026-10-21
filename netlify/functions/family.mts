@@ -47,7 +47,7 @@ export default async (req: Request) => {
     if (fam.miembros.some(m => m.email.toLowerCase() === email)) return json({ error: "Esa persona ya tiene acceso." }, 400);
     const cuentaDueno = (await stores.cuentas().get(fam.ownerId, { type: "json" })) as Cuenta | null;
     const cupo = cupoDe(cuentaDueno);
-    if (fam.miembros.length + fam.invitaciones.length >= cupo) return json({ error: `Tu plan permite ${cupo} personas con acceso (contándote a ti y las invitaciones pendientes). Pasa a un plan más grande para invitar a más.`, code: "cupo" }, 400);
+    if (fam.miembros.length + fam.invitaciones.length >= cupo) return json({ error: `Tu familia ya tiene ${cupo} personas con acceso (contando las invitaciones pendientes). Si necesitas más, escríbenos.`, code: "cupo" }, 400);
     const inv: Invite = { familyId: fam.id, rol: r, por: user.email || "", familia: fam.nombre, at: new Date().toISOString() };
     await famStores.invites().setJSON(emailKey(email), inv);
     fam.invitaciones = fam.invitaciones.filter(i => i.email !== email).concat({ email, rol: r, at: inv.at, por: inv.por });

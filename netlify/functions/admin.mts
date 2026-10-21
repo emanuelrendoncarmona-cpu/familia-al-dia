@@ -1,6 +1,24 @@
 // /api/admin — panel para activar planes. Solo usuarios con el rol "admin" (se asigna en Netlify > Identity).
 import type { Config } from "@netlify/functions";
 import { requireUser, isAdmin, stores, estadoCuenta, json, PLANES, type Cuenta, type TipoPlan } from "../../lib/common.mts";
+import { vapidKeys, sendPush, pushStore, type Sub } from "../../lib/push.mts";
+
+const sumarMes = (desde: number) => { const d = new Date(desde); return new Date(d.getFullYear(), d.getMonth() + 1, d.getDate(), 23, 59).toISOString(); };
+
+// Cuando una familia invitada paga por primera vez, quien la invitó gana 1 mes gratis.
+async function premiarReferido(c: Cuenta) {
+  if (!c.referidoPor || c.refPremiado) return;
+  const s = stores.cuentas();
+  const r = (await s.get(c.referidoPor, { type: "json" })) as Cuenta | null;
+  c.refPremiado = true;
+  if (!r) return;
+  const base = Math.max(Date.now(), r.pagoHasta ? Date.parse(r.pagoHasta) : 0, Date.parse(r.trialHasta) || 0);
+  r.pagoHasta = sumarMes(base); r.referidosPagos = (r.referidosPagos || 0) + 1; r.avisoBorrado = null;
+  await s.setJSON(r.userId, r);
+  if (!vapidKeys()) return;
+  const reg = ((await (await pushStore()).get(r.userId, { type: "json" })) as { subs: Sub[] } | null) || { subs: [] };
+  for (const sub of reg.subs) { try { await sendPush(sub, { title: "¡Ganaste 1 mes gratis de FamiliSalud!", body: "Una familia que invitaste activó su plan. Gracias por recomendarnos.", tag: "referido", url: "/" }); } catch {} }
+}
 
 export default async (req: Request) => {
   const user = await requireUser();
@@ -9,9 +27,13 @@ export default async (req: Request) => {
   const s = stores.cuentas();
 
   if (req.method === "GET") {
+    // Guardamos quién administra para avisarle por notificación de nuevas solicitudes de cita.
+    const aj = stores.ajustes(); const adm = ((await aj.get("admins", { type: "json" })) as { ids: string[] } | null) || { ids: [] };
+    if (!adm.ids.includes(user.id)) { adm.ids.push(user.id); await aj.setJSON("admins", adm); }
     const { blobs } = await s.list();
     const cuentas = (await Promise.all(blobs.map(b => s.get(b.key, { type: "json" })))).filter(Boolean) as Cuenta[];
-    const rows = cuentas.map(c => ({ userId: c.userId, email: c.email, creada: c.creada, notas: c.notas || "", ...estadoCuenta(c), pagoHasta: c.pagoHasta, trialHasta: c.trialHasta }))
+    const mail = new Map(cuentas.map(c => [c.userId, c.email]));
+    const rows = cuentas.map(c => ({ userId: c.userId, email: c.email, creada: c.creada, notas: c.notas || "", ...estadoCuenta(c), pagoHasta: c.pagoHasta, trialHasta: c.trialHasta, invitadoPor: c.referidoPor ? mail.get(c.referidoPor) || "otra familia" : null, referidos: c.referidosPagos || 0 }))
       .sort((a, b) => b.creada.localeCompare(a.creada));
     return json({ cuentas: rows, total: rows.length, pagos: rows.filter(r => r.plan === "pago").length, prueba: rows.filter(r => r.plan === "prueba").length });
   }
@@ -40,6 +62,7 @@ export default async (req: Request) => {
     else return json({ error: "Acción desconocida." }, 400);
     if (typeof body.notas === "string") c.notas = body.notas.slice(0, 300);
     if (estadoCuenta(c).activo) { c.avisoBorrado = null; }
+    if (body.accion === "mes" || body.accion === "anio") await premiarReferido(c);
     await s.setJSON(c.userId, c);
     return json({ ok: true, cuenta: { ...c, ...estadoCuenta(c) } });
   }
