@@ -353,7 +353,7 @@ let famInfo = null, rol = 'admin', baseSnap = null, invitacion = null;
 let netlifyId = null, idSettings = null, authUser = null, acct = null, isAdminUser = false, pendingSync = false, recoveryPending = false, authNotice = '', lastFetch = 0;
 const IDENTITY_URL = 'https://cdn.jsdelivr.net/npm/@netlify/identity@2.0.0/+esm';
 // Planes y forma de pago. Pega aquí tus links de Wompi o Mercado Pago y tu WhatsApp de ventas (solo números, con 57).
-const PAGO = { mensual: '$9.900 COP al mes', anual: '$99.000 COP al año', montoMensual: '9900', montoAnual: '99000', llave: '3215611475', titular: 'Emnova', qr: '', linkMensual: '', linkAnual: '', whatsapp: '', correo: 'emanuelrendoncarmona@gmail.com' };
+const PAGO = { mensual: '$9.900 COP al mes', anual: '$99.000 COP al año', montoMensual: '9900', montoAnual: '99000', llave: '0093101200', titular: 'Emnova Emanuel Rendon', qrMensual: 'pago-mensual.png', qrAnual: 'pago-anual.png', linkMensual: '', linkAnual: '', whatsapp: '', correo: 'emanuelrendoncarmona@gmail.com' };
 const DEMO_MSG = 'Estás viendo la familia de ejemplo: no hay datos tuyos para exportar. Toca “Empezar con la mía” para agregar tu familia.';
 const aiOn = () => !!sampleApi || mode === 'netlify';
 const photoOn = () => sampleImages || mode === 'netlify';
@@ -1234,19 +1234,27 @@ function openPlan() {
     <span class="small">Incluye: personas ilimitadas, acceso para cada integrante con su correo, asistente con IA, lectura de fotos, búsqueda de citas particulares, calendario conectado y canales de todas las EPS.</span>
     ${PAGO.llave ? `<div class="card" style="gap:10px;border-color:var(--accent)">
       <b>Paga con Nequi o desde cualquier banco (Bre-B)</b>
-      ${PAGO.qr ? `<img src="${esc(PAGO.qr)}" alt="Código QR para pagar a ${esc(PAGO.titular)}" style="width:min(240px,100%);justify-self:center;border-radius:12px;background:#fff;padding:8px">` : ''}
-      <div class="row"><span class="grow"><span class="small muted">Llave</span><br><b class="mono" style="font-size:1.25rem">${esc(PAGO.llave)}</b></span><button class="btn sm primary" data-copy="${esc(PAGO.llave)}">${ic('copy')} Copiar llave</button></div>
+      <div class="seg" role="group" aria-label="Plan" id="pq-seg"><button aria-pressed="true" data-plan="mensual">Mensual · $9.900</button><button aria-pressed="false" data-plan="anual">Anual · $99.000</button></div>
+      <img id="pq-img" src="${esc(PAGO.qrMensual)}" alt="Código QR Bre-B para pagar $9.900 a ${esc(PAGO.titular)}" style="width:min(280px,100%);justify-self:center;border-radius:16px">
+      <div class="chips" style="justify-content:center"><a class="btn sm" id="pq-dl" href="${esc(PAGO.qrMensual)}" download="familia-al-dia-pago-mensual.png">Guardar QR</a><button class="btn sm primary" data-copy="${esc(PAGO.llave)}">${ic('copy')} Copiar llave ${esc(PAGO.llave)}</button></div>
       <ol style="margin:0;padding-left:1.2em;display:grid;gap:6px" class="small">
-        <li>Abre Nequi o la app de tu banco y elige <b>Enviar plata</b> ${PAGO.qr ? 'o escanea el código' : ''} a la llave <b>${esc(PAGO.llave)}</b>.</li>
-        <li>Pon el monto: <b>$9.900</b> (mensual) o <b>$99.000</b> (anual).</li>
-        <li>En el mensaje o descripción escribe tu correo${email ? `: <b style="overflow-wrap:anywhere">${esc(email)}</b>` : ''}.</li>
-        <li>Envía el comprobante. Activamos tu plan en menos de 24 horas hábiles.</li>
+        <li><b>Desde otro celular o computador:</b> escanea el QR con Nequi o la app de tu banco. El monto ya viene puesto.</li>
+        <li><b>Desde este mismo celular:</b> toca <b>Guardar QR</b> y en tu app elige pagar con QR desde la galería, o envía a la llave <b>${esc(PAGO.llave)}</b> el monto del plan.</li>
+        <li>Revisa que aparezca <b>${esc(PAGO.titular)}</b> antes de confirmar.</li>
+        <li>Si te deja mensaje, escribe tu correo${email ? `: <b style="overflow-wrap:anywhere">${esc(email)}</b>` : ''}. Envía el comprobante y activamos tu plan en menos de 24 horas hábiles.</li>
       </ol>
       <div class="chips">${email ? `<button class="btn sm" data-copy="${esc(email)}">${ic('copy')} Copiar mi correo</button>` : ''}${PAGO.whatsapp ? `<a class="btn sm" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('share')} Comprobante por WhatsApp</a>` : ''}<a class="btn sm" href="${esc(mail)}">Comprobante por correo</a></div>
-      <span class="small muted">Verifica que el nombre que aparece al enviar sea el titular de la llave antes de confirmar.</span>
     </div>` : ''}
     ${PAGO.linkMensual || PAGO.linkAnual ? `<div class="actions">${PAGO.linkMensual ? `<a class="btn primary" href="${esc(PAGO.linkMensual)}" target="_blank" rel="noopener">Pagar mensual con tarjeta</a>` : ''}${PAGO.linkAnual ? `<a class="btn" href="${esc(PAGO.linkAnual)}" target="_blank" rel="noopener">Pagar anual con tarjeta</a>` : ''}</div>` : ''}
-    <p class="small muted" style="margin:0">¿Dudas con el pago? Escribe a <span class="mono">${esc(PAGO.correo)}</span>.</p>`, r => { r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy)); });
+    <p class="small muted" style="margin:0">¿Dudas con el pago? Escribe a <span class="mono">${esc(PAGO.correo)}</span>.</p>`, r => {
+    r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
+    r.querySelectorAll('#pq-seg [data-plan]').forEach(b => b.onclick = () => {
+      const an = b.dataset.plan === 'anual'; r.querySelectorAll('#pq-seg [data-plan]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      const img = r.querySelector('#pq-img'), dl = r.querySelector('#pq-dl');
+      img.src = an ? PAGO.qrAnual : PAGO.qrMensual; img.alt = `Código QR Bre-B para pagar ${an ? '$99.000' : '$9.900'} a ${PAGO.titular}`;
+      dl.href = img.src; dl.download = `familia-al-dia-pago-${an ? 'anual' : 'mensual'}.png`;
+    });
+  });
 }
 function openCalendar() {
   if (!acct || !acct.calUrl) { toast('Entra con tu cuenta para conectar el calendario'); return; }
