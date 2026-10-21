@@ -1,12 +1,12 @@
 {
-  "name": "Al Día",
-  "short_name": "Al Día",
-  "description": "Citas, órdenes, controles y medicamentos de tu familia en un solo lugar.",
+  "name": "FamiliSalud",
+  "short_name": "FamiliSalud",
+  "description": "Tus citas médicas, más fáciles. Citas, órdenes, controles y medicamentos de tu familia en un solo lugar.",
   "lang": "es-CO",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0E1A2B",
+  "background_color": "#FFFFFF",
   "theme_color": "#0E1A2B",
   "icons": [
     {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
