@@ -17,12 +17,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;700&display=swap">
 <style>
-/* Emnova brand: nova orange for the main action, noche for ground and text, flujo for done/connection, brillo for one highlight.
+/* FamiliSalud brand (from the logo): blue for the main action, teal for done/connection/assistant, noche for text, brillo for one highlight.
    Layout: a mission-control for the family's health. One "next up" instrument with a live countdown, a 14-day orbit strip, an assistant bar you talk to, and thumb-reach navigation at the bottom. */
 :root{
   --bg:#F4F6F9; --bg2:#E9EDF2; --glass:rgba(255,255,255,.82); --solid:#FFFFFF; --sunk:#E8ECF1; --ink:#0E1A2B; --muted:#4F5D70; --line:rgba(14,26,43,.10);
-  --accent:#FF5A1F; --accent-text:#B83A0B; --accent-ink:#0E1A2B; --accent-soft:rgba(255,90,31,.12); --glow:rgba(255,90,31,.20);
-  --ai:#0B7F75; --ai-soft:rgba(15,168,154,.12);
+  --accent:#0B5CC4; --accent-text:#0A4FA8; --accent-ink:#FFFFFF; --accent-soft:rgba(11,92,196,.10); --glow:rgba(11,92,196,.16);
+  --ai:#0A7F6C; --ai-soft:rgba(18,165,140,.12);
   --warn:#8A5A00; --warn-soft:rgba(255,194,61,.28); --crit:#B3261E; --crit-soft:#F9DEDB; --good:#0B7F75; --good-soft:rgba(15,168,154,.14);
   --m1:#0B7F75; --m2:#D9480F; --m3:#3A5BC7; --m4:#8B4FB3; --m5:#9A7414; --m6:#0E1A2B;
   --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
@@ -33,14 +33,14 @@
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0E1A2B; --bg2:#13223A; --glass:rgba(22,36,58,.78); --solid:#16253D; --sunk:#1C2D47; --ink:#EEF2F7; --muted:#A3B0C2; --line:rgba(200,215,235,.12);
-  --accent:#FF5A1F; --accent-text:#FF8A5C; --accent-ink:#0E1A2B; --accent-soft:rgba(255,90,31,.16); --glow:rgba(255,90,31,.30);
+  --accent:#1F6FE0; --accent-text:#8DBBFF; --accent-ink:#FFFFFF; --accent-soft:rgba(61,139,255,.16); --glow:rgba(61,139,255,.26);
   --ai:#2FD1C1; --ai-soft:rgba(15,168,154,.16);
   --warn:#FFC23D; --warn-soft:rgba(255,194,61,.14); --crit:#FF8A80; --crit-soft:rgba(255,138,128,.15); --good:#2FD1C1; --good-soft:rgba(15,168,154,.16);
   --m1:#2FD1C1; --m2:#FF8A5C; --m3:#8FA9FF; --m4:#D09CF5; --m5:#FFC23D; --m6:#EEF2F7;
   --shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 12px 40px rgba(0,0,0,.4); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0E1A2B; --bg2:#13223A; --glass:rgba(22,36,58,.78); --solid:#16253D; --sunk:#1C2D47; --ink:#EEF2F7; --muted:#A3B0C2; --line:rgba(200,215,235,.12);
-  --accent:#FF5A1F; --accent-text:#FF8A5C; --accent-ink:#0E1A2B; --accent-soft:rgba(255,90,31,.16); --glow:rgba(255,90,31,.30);
+  --accent:#1F6FE0; --accent-text:#8DBBFF; --accent-ink:#FFFFFF; --accent-soft:rgba(61,139,255,.16); --glow:rgba(61,139,255,.26);
   --ai:#2FD1C1; --ai-soft:rgba(15,168,154,.16);
   --warn:#FFC23D; --warn-soft:rgba(255,194,61,.14); --crit:#FF8A80; --crit-soft:rgba(255,138,128,.15); --good:#2FD1C1; --good-soft:rgba(15,168,154,.16);
   --m1:#2FD1C1; --m2:#FF8A5C; --m3:#8FA9FF; --m4:#D09CF5; --m5:#FFC23D; --m6:#EEF2F7;
