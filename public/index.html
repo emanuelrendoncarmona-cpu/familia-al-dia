@@ -360,8 +360,8 @@ let netlifyId = null, idSettings = null, authUser = null, acct = null, isAdminUs
 const IDENTITY_URL = 'https://cdn.jsdelivr.net/npm/@netlify/identity@2.0.0/+esm';
 // Planes y forma de pago. Pega aquí tus links de Wompi o Mercado Pago y tu WhatsApp de ventas (solo números, con 57).
 const PAGO = { llave: '0093101200', titular: 'Emnova Emanuel Rendon', linkMensual: '', linkAnual: '', whatsapp: '', correo: 'emanuelrendoncarmona@gmail.com' };
-// Plan único: personas ilimitadas. Los QR se agregan cuando estén listos (mientras, se paga con llave + monto).
-const PLAN = { nombre: 'Familiar', mensual: 14900, anual: 149000, gestion: 19900, qrMensual: '', qrAnual: '', qrGestion: '' };
+// Plan único: personas ilimitadas. QR Bre-B de Nequi Negocios con el monto ya incluido.
+const PLAN = { nombre: 'Familiar', mensual: 14900, anual: 149000, gestion: 19900, qrMensual: 'qr-mensual-14900.png', qrAnual: 'qr-anual-149000.png', qrGestion: 'qr-cita-19900.png' };
 const money = n => '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 let gest = [], gestPrecio = PLAN.gestion;
 const GEST_TXT = { pago: ['Esperando tu pago', 'warn'], proceso: ['Gestionando con la EPS', 'accent'], lista: ['¡Cita lista!', 'good'], no: ['No se pudo', 'crit'] };
