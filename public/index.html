@@ -268,6 +268,8 @@ footer.foot{margin-top:36px;font-size:.8125rem;color:var(--muted);display:grid;g
 const $ = (s, el = document) => el.querySelector(s);
 const md = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/^\s*[-*] /gm, '• ');
 const safeUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '#';
+const TIPODOC = { CC: 'Cédula de ciudadanía', TI: 'Tarjeta de identidad', RC: 'Registro civil', CE: 'Cédula de extranjería', PA: 'Pasaporte', PEP: 'Permiso especial (PEP)', PPT: 'Permiso de protección temporal (PPT)', MS: 'Menor sin identificación', AS: 'Adulto sin identificación' };
+const docLabel = m => { const t = (m && m.tipoDoc) || ''; const n = (m && m.doc) || ''; return (t && n) ? `${t} ${n}` : (n || t || '—'); };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const pad = n => String(n).padStart(2, '0');
@@ -770,7 +772,7 @@ function familiaHTML() {
     const pend = S.auts.filter(a => a.miembroId === m.id && a.estado !== 'usada').length; const e = epsOf(m);
     return `<div class="card member"><span class="avatar" style="background:${mColor(m)}">${esc(initials(m.nombre))}</span>
       <span class="main"><span class="row"><b class="grow">${esc(m.nombre)}</b><span class="badge">${esc(m.parentesco || '')}</span></span>
-      <dl class="facts"><dt>EPS</dt><dd>${esc(m.eps || '—')}${m.regimen ? ' · ' + esc(m.regimen) : ''}</dd><dt>Documento</dt><dd class="mono">${esc(m.doc || '—')}</dd>${m.alergias ? `<dt>Alergias</dt><dd><span class="badge crit">${esc(m.alergias)}</span></dd>` : ''}<dt>Próxima</dt><dd>${prox ? `${esc(citaTitle(prox))}, ${fmtDate(prox.fecha)}` : 'Sin citas'}</dd><dt>Órdenes</dt><dd>${pend} ${pend === 1 ? 'vigente' : 'vigentes'}</dd></dl>
+      <dl class="facts"><dt>EPS</dt><dd>${esc(m.eps || '—')}${m.regimen ? ' · ' + esc(m.regimen) : ''}</dd><dt>Documento</dt><dd class="mono">${esc(docLabel(m))}</dd>${m.alergias ? `<dt>Alergias</dt><dd><span class="badge crit">${esc(m.alergias)}</span></dd>` : ''}<dt>Próxima</dt><dd>${prox ? `${esc(citaTitle(prox))}, ${fmtDate(prox.fecha)}` : 'Sin citas'}</dd><dt>Órdenes</dt><dd>${pend} ${pend === 1 ? 'vigente' : 'vigentes'}</dd></dl>
       <div class="actions"><button class="btn sm primary" data-pedir="${m.id}">${ic('cal')} Pedir cita${e ? ' a ' + esc(e.n) : ''}</button><button class="btn sm" data-part="${m.id}">${ic('spark')} Particular</button><button class="btn sm" data-member="${m.id}">Editar</button></div></span></div>`;
   }).join('') : `<div class="empty"><b>Aún no hay nadie</b><span class="muted small">Agrega a las personas cuyas citas organizas.</span></div>`}</div>
   ${mode === 'netlify' && famInfo ? accessHTML() : ''}
@@ -910,10 +912,10 @@ function demoData() {
   const ana = uid(), luis = uid(), sofi = uid(), carmen = uid();
   const s = emptyState(); s.ejemplo = true; s.familia.nombre = 'Ramírez (ejemplo)';
   s.miembros = [
-    { id: ana, nombre: 'Ana Ramírez', parentesco: 'Yo', color: '--m1', eps: 'EPS Sanitas', regimen: 'contributivo', doc: 'CC 0000000', nac: '1986-04-12', alergias: '', notas: '' },
-    { id: luis, nombre: 'Luis Pérez', parentesco: 'Pareja', color: '--m3', eps: 'EPS Sanitas', regimen: 'contributivo', doc: 'CC 0000001', nac: '1984-09-02', alergias: '', notas: '' },
-    { id: sofi, nombre: 'Sofía Pérez', parentesco: 'Hija', color: '--m4', eps: 'EPS Sanitas', regimen: 'contributivo', doc: 'TI 0000002', nac: '2014-02-20', alergias: 'Penicilina', notas: '' },
-    { id: carmen, nombre: 'Carmen Ruiz', parentesco: 'Mamá', color: '--m2', eps: 'Nueva EPS', regimen: 'subsidiado', doc: 'CC 0000003', nac: '1952-11-30', alergias: '', notas: 'Usa audífono.' },
+    { id: ana, nombre: 'Ana Ramírez', parentesco: 'Yo', color: '--m1', eps: 'EPS Sanitas', regimen: 'contributivo', tipoDoc: 'CC', doc: '0000000', nac: '1986-04-12', alergias: '', notas: '' },
+    { id: luis, nombre: 'Luis Pérez', parentesco: 'Pareja', color: '--m3', eps: 'EPS Sanitas', regimen: 'contributivo', tipoDoc: 'CC', doc: '0000001', nac: '1984-09-02', alergias: '', notas: '' },
+    { id: sofi, nombre: 'Sofía Pérez', parentesco: 'Hija', color: '--m4', eps: 'EPS Sanitas', regimen: 'contributivo', tipoDoc: 'TI', doc: '0000002', nac: '2014-02-20', alergias: 'Penicilina', notas: '' },
+    { id: carmen, nombre: 'Carmen Ruiz', parentesco: 'Mamá', color: '--m2', eps: 'Nueva EPS', regimen: 'subsidiado', tipoDoc: 'CC', doc: '0000003', nac: '1952-11-30', alergias: '', notas: 'Usa audífono.' },
   ];
   const req = (tipo, okN = 0) => TIPOS[tipo].req.map((x, i) => ({ t: x, ok: i < okN }));
   s.citas = [
@@ -1084,7 +1086,8 @@ function openMember(id) {
       <label class="f">Fecha de nacimiento<input type="date" id="mm-nac" value="${esc(m.nac || '')}"></label>
       <label class="f">EPS<input id="mm-eps" value="${esc(m.eps || '')}" list="eps-list" placeholder="Escribe o elige"><datalist id="eps-list">${EPS.map(e => `<option>${esc(e.n)}</option>`).join('')}</datalist></label>
       <label class="f">Régimen<select id="mm-reg"><option value="">No sé</option><option value="contributivo" ${m.regimen === 'contributivo' ? 'selected' : ''}>Contributivo</option><option value="subsidiado" ${m.regimen === 'subsidiado' ? 'selected' : ''}>Subsidiado</option></select></label>
-      <label class="f">Documento<input id="mm-doc" value="${esc(m.doc || '')}" placeholder="CC, TI o RC y número"></label>
+      <label class="f">Tipo de documento<select id="mm-tipodoc">${Object.entries(TIPODOC).map(([k, t]) => `<option value="${k}" ${((m.tipoDoc || 'CC') === k) ? 'selected' : ''}>${k} · ${t}</option>`).join('')}</select></label>
+      <label class="f">N.° de documento<input id="mm-doc" value="${esc(m.doc || '')}" inputmode="numeric" placeholder="Solo el número"></label>
       <p class="small muted full" style="margin:0">¿No sabes a qué EPS está afiliado? <a href="${ADRES_URL}" target="_blank" rel="noopener">Consúltalo en ADRES</a>.</p>
       <label class="f full">Alergias<input id="mm-al" value="${esc(m.alergias || '')}" placeholder="Opcional"></label>
       <label class="f full">Notas para las citas<textarea id="mm-no" placeholder="Ej.: usa audífono">${esc(m.notas || '')}</textarea></label>
@@ -1097,7 +1100,7 @@ function openMember(id) {
     }));
     r.querySelector('#mm-save').onclick = () => {
       const n = val(r, 'mm-n'); if (!n) { r.querySelector('#mm-n').focus(); toast('Falta el nombre'); return; }
-      const data = { nombre: n, parentesco: val(r, 'mm-p'), nac: val(r, 'mm-nac'), eps: val(r, 'mm-eps'), regimen: val(r, 'mm-reg'), doc: val(r, 'mm-doc'), alergias: val(r, 'mm-al'), notas: val(r, 'mm-no') };
+      const data = { nombre: n, parentesco: val(r, 'mm-p'), nac: val(r, 'mm-nac'), eps: val(r, 'mm-eps'), regimen: val(r, 'mm-reg'), tipoDoc: val(r, 'mm-tipodoc'), doc: val(r, 'mm-doc'), alergias: val(r, 'mm-al'), notas: val(r, 'mm-no') };
       if (id) Object.assign(m, data); else S.miembros.push(Object.assign({ id: uid(), color: m.color }, data));
       persist(); dlg.close(); render(); toast(id ? 'Datos actualizados' : `${n.split(' ')[0]} agregado a la familia`);
     };
@@ -1582,7 +1585,7 @@ function openPlus() {
 
 // ---------- request an appointment from the EPS ----------
 function scriptFor(m, que, pre) {
-  return `Hola, quiero solicitar una cita${que ? ' de ' + que : ''} para ${m?.nombre || ''}${m?.doc ? ', documento ' + m.doc : ''}.${pre.numero ? ` Tengo la autorización N.° ${pre.numero}.` : ''} ¿Qué fechas tienen disponibles?`;
+  return `Hola, quiero solicitar una cita${que ? ' de ' + que : ''} para ${m?.nombre || ''}${m && (m.tipoDoc || m.doc) ? ', documento ' + docLabel(m) : ''}.${pre.numero ? ` Tengo la autorización N.° ${pre.numero}.` : ''} ¿Qué fechas tienen disponibles?`;
 }
 function channelsHTML(m, que, pre) {
   const e = epsOf(m);
@@ -1647,7 +1650,7 @@ function openSol(id) {
 
 function openReclamo(id) {
   const x = S.sols.find(y => y.id === id); if (!x) return; const m = member(x.miembroId); const e = epsOf(m); const n = -daysUntil(x.fecha);
-  const carta = `Señores ${e ? e.n : (m?.eps || 'EPS')}:\nEl ${fmtLong(x.fecha)} solicité una cita de ${x.que} para ${m?.nombre || ''}${m?.doc ? ', documento ' + m.doc : ''}, por ${x.canal}${x.radicado ? ', con radicado N.° ' + x.radicado : ''}. Han pasado ${n} días y no he recibido respuesta.\nSolicito que se asigne la cita lo antes posible y que me informen la fecha por este medio.\nGracias.`;
+  const carta = `Señores ${e ? e.n : (m?.eps || 'EPS')}:\nEl ${fmtLong(x.fecha)} solicité una cita de ${x.que} para ${m?.nombre || ''}${m && (m.tipoDoc || m.doc) ? ', documento ' + docLabel(m) : ''}, por ${x.canal}${x.radicado ? ', con radicado N.° ' + x.radicado : ''}. Han pasado ${n} días y no he recibido respuesta.\nSolicito que se asigne la cita lo antes posible y que me informen la fecha por este medio.\nGracias.`;
   openDialog(`${head('No te dan la cita: qué hacer')}
     <ol style="margin:0;padding-left:1.2em;display:grid;gap:10px">
       <li><b>Insiste por otro canal de la EPS.</b> Si llamaste, prueba la web o el WhatsApp, y al revés. <button class="btn ghost sm" id="rc-ch">Ver canales</button></li>
