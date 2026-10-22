@@ -2,7 +2,7 @@
 // a todos los celulares registrados de los integrantes de la familia.
 import type { Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
-import { stores, famStores, estadoCuenta, type Familia, type Cuenta } from "../../lib/common.mts";
+import { stores, famStores, estadoCuenta, indexarAgenda, type Familia, type Cuenta } from "../../lib/common.mts";
 import { vapidKeys, sendPush, pushStore, type Sub } from "../../lib/push.mts";
 
 const DIA = 864e5, HORA = 36e5, MIN = 6e4;
@@ -17,9 +17,19 @@ export default async () => {
   const hoy = new Date(now - 5 * HORA).toISOString().slice(0, 10);
   const enviados = getStore({ name: "avisos-enviados", consistency: "strong" });
   const subsStore = await pushStore();
-  const { blobs } = await stores.agendas().list();
+  // Primera vez: arma el índice de fechas a partir de las agendas existentes.
+  const aj = stores.ajustes();
+  if (!(await aj.get("idx-citas-v1"))) {
+    const { blobs } = await stores.agendas().list();
+    for (const { key } of blobs) { try { await indexarAgenda(key, await stores.agendas().get(key, { type: "json" })); } catch {} }
+    await aj.set("idx-citas-v1", new Date().toISOString());
+  }
+  const idx = stores.idxCitas();
+  const manana = new Date(now - 5 * HORA + DIA).toISOString().slice(0, 10);
+  const fams = new Set<string>();
+  for (const d of [hoy, manana]) { const { blobs } = await idx.list({ prefix: `dia/${d}/` }); for (const b of blobs) fams.add(b.key.split("/")[2]); }
   let total = 0;
-  for (const { key: famId } of blobs) {
+  for (const famId of fams) {
     const a: any = await stores.agendas().get(famId, { type: "json" });
     if (!a || a.ejemplo || !Array.isArray(a.citas)) continue;
     const due: { c: any; tipo: "dia" | "hora" }[] = [];

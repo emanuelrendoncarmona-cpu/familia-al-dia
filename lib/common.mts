@@ -13,7 +13,25 @@ export const stores = {
   referidos: () => getStore({ name: "referidos", consistency: "strong" }),
   gestiones: () => getStore({ name: "gestiones", consistency: "strong" }),
   ajustes: () => getStore({ name: "ajustes", consistency: "strong" }),
+  idxCitas: () => getStore({ name: "idx-citas", consistency: "strong" }),
 };
+
+// Índice de fechas con citas: el recordatorio solo revisa las familias con citas hoy o mañana,
+// en vez de leer todas las agendas cada 10 minutos (así aguanta miles de familias).
+export async function indexarAgenda(famId: string, agenda: any) {
+  const s = stores.idxCitas();
+  const hoy = new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
+  const nuevos = new Set<string>();
+  for (const c of Array.isArray(agenda?.citas) ? agenda.citas : []) {
+    if (!["pendiente", "confirmada"].includes(c?.estado) || !/^\d{4}-\d{2}-\d{2}$/.test(c?.fecha || "") || c.fecha < hoy) continue;
+    nuevos.add(c.fecha);
+  }
+  if (agenda?.ejemplo) nuevos.clear();
+  const prev = ((await s.get(`fam/${famId}`, { type: "json" })) as { dias: string[] } | null)?.dias || [];
+  for (const d of prev) if (!nuevos.has(d)) await s.delete(`dia/${d}/${famId}`);
+  for (const d of nuevos) if (!prev.includes(d)) await s.set(`dia/${d}/${famId}`, "1");
+  await s.setJSON(`fam/${famId}`, { dias: [...nuevos].slice(0, 400) });
+}
 
 // Precios en pesos (los muestra la app; el plan se activa a mano desde el panel al ver el pago).
 export const PRECIOS = { mensual: 14900, anual: 149000, gestion: 19900 };

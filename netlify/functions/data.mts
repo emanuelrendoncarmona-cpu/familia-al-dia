@@ -1,6 +1,6 @@
 // /api/data — agenda compartida de la familia del usuario (con control de versiones para no pisar cambios).
 import type { Config } from "@netlify/functions";
-import { requireUser, getCuenta, estadoCuenta, stores, json, resolveFamily, familiaPublica, usoMes, USO_MES, PRECIOS, type Cuenta } from "../../lib/common.mts";
+import { requireUser, getCuenta, estadoCuenta, stores, json, resolveFamily, familiaPublica, usoMes, USO_MES, PRECIOS, indexarAgenda, type Cuenta } from "../../lib/common.mts";
 
 const MAX_BYTES = 900_000;
 
@@ -39,6 +39,7 @@ export default async (req: Request) => {
     data.guardado = new Date().toISOString();
     data.guardadoPor = user.email || "";
     await stores.agendas().setJSON(fam.id, data);
+    try { await indexarAgenda(fam.id, data); } catch (e: any) { console.error("[data] indice", e?.message); }
     return json({ ok: true, guardado: data.guardado, version: data.version });
   }
 
@@ -59,6 +60,7 @@ export default async (req: Request) => {
   if (req.method === "DELETE") {
     if (rol !== "admin") return json({ error: "Solo quien administra la familia puede borrar los datos." }, 403);
     await stores.agendas().delete(fam.id);
+    try { await indexarAgenda(fam.id, null); } catch {}
     return json({ ok: true });
   }
 

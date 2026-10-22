@@ -364,7 +364,14 @@ const PAGO = { llave: '0093101200', titular: 'Emnova Emanuel Rendon', linkMensua
 const PLAN = { nombre: 'Familiar', mensual: 14900, anual: 149000, gestion: 19900, qrMensual: 'qr-mensual-14900.png', qrAnual: 'qr-anual-149000.png', qrGestion: 'qr-cita-19900.png' };
 const money = n => '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 let gest = [], gestPrecio = PLAN.gestion;
-const GEST_TXT = { pago: ['Esperando tu pago', 'warn'], proceso: ['Gestionando con la EPS', 'accent'], lista: ['¡Cita lista!', 'good'], no: ['No se pudo', 'crit'] };
+const GEST_SERV = {
+  cita: { t: 'Sacar una cita', sub: 'Pedimos la cita a la EPS y te avisamos la fecha.', que: '¿Qué cita necesita?', ph: 'Ej.: Medicina general, Pediatría, Ortopedia', lugar: 'Ciudad o sede que prefieres', disp: true, foto: 'Foto de la orden médica o autorización (si la tiene)' },
+  radicar: { t: 'Radicar una orden o autorización', sub: 'Enviamos la orden a la EPS para que la autoricen y hacemos seguimiento.', que: '¿Qué dice la orden?', ph: 'Ej.: Resonancia de rodilla, terapia física, cirugía', lugar: 'Ciudad', disp: false, foto: 'Foto de la orden médica (obligatoria)', req: true },
+  historia: { t: 'Pedir la historia clínica', sub: 'La solicitamos a la clínica u hospital que atendió a la persona.', que: '¿De qué clínica, hospital o IPS?', ph: 'Ej.: Hospital San Juan de Dios, Armenia', lugar: 'Ciudad', disp: false, foto: 'Foto del documento de la persona (opcional)' },
+  otro: { t: 'Otro trámite con la EPS', sub: 'Medicamentos pendientes, MIPRES, cambio de IPS, quejas y más.', que: '¿Qué trámite necesitas?', ph: 'Ej.: no me entregan un medicamento', lugar: 'Ciudad', disp: false, foto: 'Foto de algún documento relacionado (opcional)' },
+};
+const servDe = g => GEST_SERV[g.servicio] ? g.servicio : 'cita';
+const GEST_TXT = { pago: ['Esperando tu pago', 'warn'], proceso: ['Un asesor lo está haciendo', 'accent'], lista: ['¡Listo!', 'good'], no: ['No se pudo', 'crit'] };
 const DEMO_MSG = 'Estás viendo la familia de ejemplo: no hay datos tuyos para exportar. Toca “Empezar con la mía” para agregar tu familia.';
 const aiOn = () => !!sampleApi || mode === 'netlify';
 const photoOn = () => sampleImages || mode === 'netlify';
@@ -649,12 +656,14 @@ function alerts() {
     if (n >= 5) out.push({ lvl: n >= 10 ? 'crit' : 'warn', k: 'alert', title: `Llevas ${n} días esperando · ${x.que} (${first(m)})`, sub: 'Insiste por otro canal o pon una queja. Te decimos cómo.', act: ['Qué hago', () => openReclamo(x.id)] });
   });
   gest.forEach(g => {
-    if (g.estado === 'lista' && !g.agregada) out.push({ lvl: 'warn', k: 'check', title: `¡Te sacamos la cita! ${g.que} · ${first({ nombre: g.persona.nombre })}`, sub: `${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}. Agrégala a tu agenda.`, act: ['Ver', () => openGestDetail(g.id)] });
-    else if (g.estado === 'pago') out.push({ lvl: 'info', k: 'clock', title: `Falta tu pago · cita de ${g.que}`, sub: `Paga ${money(g.precio)} para que empecemos a pedirla.`, act: ['Pagar', () => openGestDetail(g.id)] });
-    else if (g.estado === 'no') out.push({ lvl: 'warn', k: 'alert', title: `No pudimos sacar la cita de ${g.que}`, sub: 'Te devolvemos el dinero. Mira las opciones.', act: ['Ver', () => openGestDetail(g.id)] });
+    const esCita = servDe(g) === 'cita';
+    if (g.estado === 'lista' && !g.agregada && esCita) out.push({ lvl: 'warn', k: 'check', title: `¡Te sacamos la cita! ${g.que} · ${first({ nombre: g.persona.nombre })}`, sub: `${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}. Agrégala a tu agenda.`, act: ['Ver', () => openGestDetail(g.id)], top: true });
+    else if (g.estado === 'lista' && !g.agregada && !esCita) out.push({ lvl: 'info', k: 'check', title: `Trámite listo · ${g.que}`, sub: (g.resultado && g.resultado.notas) || 'Mira el resultado.', act: ['Ver', () => openGestDetail(g.id)], top: true });
+    else if (g.estado === 'pago') out.push({ lvl: 'info', k: 'clock', title: `Falta tu pago · ${esCita ? 'cita de ' : ''}${g.que}`, sub: `Paga ${money(g.precio)} para que el asesor empiece.`, act: ['Pagar', () => openGestDetail(g.id)], top: true });
+    else if (g.estado === 'no') out.push({ lvl: 'warn', k: 'alert', title: `No pudimos completar: ${g.que}`, sub: 'Te devolvemos el dinero. Mira las opciones.', act: ['Ver', () => openGestDetail(g.id)], top: true });
   });
   const rank = { crit: 0, warn: 1, info: 2 };
-  return out.sort((a, b) => rank[a.lvl] - rank[b.lvl]);
+  return out.sort((a, b) => (b.top ? 1 : 0) - (a.top ? 1 : 0) || rank[a.lvl] - rank[b.lvl]);
 }
 
 // ---------- share helpers ----------
@@ -716,7 +725,7 @@ function inicioHTML() {
       <span class="meta">${esc(next.lugar || 'Lugar por confirmar')}${next.acompana ? ' · acompaña ' + esc(next.acompana) : ''}</span>
       <div class="actions"><button class="btn primary" data-cita="${next.id}">${ic('check')} Alistar</button><a class="btn" href="${esc(gcalUrl(next))}" target="_blank" rel="noopener">${ic('google')} A mi calendario</a><a class="btn" href="${esc(waUrl(next))}" target="_blank" rel="noopener">${ic('share')} WhatsApp</a></div></div></div>`;
   } else hero = `<div class="empty" style="margin-top:14px"><b>No hay citas próximas</b><span class="muted small">Escribe arriba algo como “cita de odontología el lunes a las 9”, o pide una a tu EPS.</span><button class="btn primary" data-act="pedir">${ic('cal')} Pedir una cita</button></div>`;
-  const qa = `<div class="qa"><button data-act="pedir">${ic('cal')}<b>Pedir cita a la EPS</b><small>Canales oficiales y qué decir</small></button><button class="hot" data-act="particular">${ic('spark')}<b>Cita particular</b><small>Opciones con precio y calificación</small></button></div>`;
+  const qa = `<div class="qa"><button data-act="pedir">${ic('cal')}<b>Pedir cita a la EPS</b><small>Canales oficiales y qué decir</small></button><button class="hot" data-act="particular">${ic('spark')}<b>Cita particular</b><small>Opciones con precio y calificación</small></button>${mode === 'netlify' ? `<button data-act="gestion" style="grid-column:1/-1">${ic('check')}<b>¿Le cuesta hacer trámites? Un asesor lo hace por usted</b><small>Citas, órdenes, historia clínica y más · ${money(gestPrecio)}</small></button>` : ''}</div>`;
   return askHTML() + pushBannerHTML() + qa + hero + stripHTML() +
     `<div class="sec"><div class="sec-head"><h2>Atención</h2>${al.length ? `<span class="badge ${al.some(a => a.lvl === 'crit') ? 'crit' : 'warn'}">${al.length} ${al.length === 1 ? 'aviso' : 'avisos'}</span>` : ''}</div>
     ${al.length ? al.slice(0, 6).map((a, i) => `<div class="alert ${a.lvl}"><span class="ic">${ic(a.k)}</span><div class="txt"><b>${esc(a.title)}</b><span class="small muted">${esc(a.sub)}</span></div><button class="btn sm" data-alert="${i}">${esc(a.act[0])}</button></div>`).join('') : `<div class="card"><b>Todo en orden</b><span class="small muted">No hay autorizaciones por vencer ni controles atrasados.</span></div>`}</div>
@@ -1307,7 +1316,7 @@ function openPlan() {
   });
 }
 
-// ---------- servicio "Te sacamos la cita" ----------
+// ---------- Asesor FamiliSalud: una persona real hace el trámite por ti ----------
 async function loadGest() {
   if (mode !== 'netlify') return;
   try { const r = await fetch('/api/gestion', { credentials: 'same-origin' }); if (!r.ok) return; const j = await r.json(); gest = j.gestiones || []; gestPrecio = j.precio || gestPrecio; if (!dlg.open) render(); } catch (_) {}
@@ -1318,39 +1327,50 @@ async function gestPost(body) {
 }
 function gestCardHTML(g) {
   const [t, cls] = GEST_TXT[g.estado] || ['', ''];
-  return `<button class="card" data-gest="${esc(g.id)}" style="gap:4px;${g.estado === 'lista' && !g.agregada ? 'border-color:var(--good)' : ''}"><span class="row"><b class="grow">${esc(g.que)} · ${esc(first({ nombre: g.persona.nombre }))}</b><span class="badge ${cls}">${t}</span></span>
-    <span class="small muted">${g.estado === 'lista' && g.resultado ? `${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}${g.resultado.lugar ? ' · ' + esc(g.resultado.lugar) : ''}` : g.estado === 'pago' ? `Paga ${money(g.precio)} para que empecemos` : g.estado === 'proceso' ? 'Te avisamos apenas la tengamos' : esc(g.nota || '')}</span></button>`;
+  const sv = servDe(g);
+  return `<button class="card" data-gest="${esc(g.id)}" style="gap:4px;${g.estado === 'lista' && !g.agregada ? 'border-color:var(--good)' : ''}"><span class="row"><b class="grow">${sv === 'cita' ? '' : esc(GEST_SERV[sv].t) + ': '}${esc(g.que)} · ${esc(first({ nombre: g.persona.nombre }))}</b><span class="badge ${cls}">${t}</span></span>
+    <span class="small muted">${g.estado === 'lista' && g.resultado && !g.resultado.fecha ? esc(g.resultado.notas || 'Trámite listo') : g.estado === 'lista' && g.resultado ? `${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}${g.resultado.lugar ? ' · ' + esc(g.resultado.lugar) : ''}` : g.estado === 'pago' ? `Paga ${money(g.precio)} para que empecemos` : g.estado === 'proceso' ? 'Te avisamos apenas esté listo' : esc(g.nota || '')}</span></button>`;
 }
 function gestListHTML() {
   if (mode !== 'netlify') return '';
-  return `<button class="card" data-act="gestion" style="grid-template-columns:auto 1fr;column-gap:12px;align-items:center;border-color:var(--accent);text-align:left"><span class="opt-ic">${ic('check')}</span><span><b>¿Sin tiempo para llamar? Nosotros te sacamos la cita</b><br><span class="small muted">${money(gestPrecio)} por cita. Si no la conseguimos, te devolvemos el dinero.</span></span></button>`
-    + (gest.length ? `<div class="label">Citas que estamos sacando por ti</div>` + gest.map(gestCardHTML).join('') : '');
+  return `<button class="card" data-act="gestion" style="grid-template-columns:auto 1fr;column-gap:12px;align-items:center;border-color:var(--accent);text-align:left"><span class="opt-ic">${ic('check')}</span><span><b>Que un asesor lo haga por ti</b><br><span class="small muted">Sacar citas, radicar órdenes, pedir la historia clínica y otros trámites. ${money(gestPrecio)} por trámite; si no se logra, te devolvemos el dinero.</span></span></button>`
+    + (gest.length ? `<div class="label">Trámites que hace tu asesor</div>` + gest.map(gestCardHTML).join('') : '');
 }
 function openGestion(pre = {}) {
   if (mode !== 'netlify') { toast('Este servicio necesita una cuenta.'); return; }
   if (!S.miembros.length) { openMember(); return; }
   if (rol === 'lector') { toast('Tienes acceso solo para ver. Pide a quien administra la familia que haga la solicitud.'); return; }
-  let mid = pre.miembroId || S.miembros[0].id, foto = null;
+  let mid = pre.miembroId || S.miembros[0].id, foto = null, sv = GEST_SERV[pre.servicio] ? pre.servicio : null;
+  if (!sv) {
+    openDialog(`${head('Ayuda de un asesor')}
+      <p style="margin:0">Una persona de nuestro equipo hace el trámite con la EPS por ti. Solo dinos qué necesitas.</p>
+      ${Object.entries(GEST_SERV).map(([k, x]) => `<button class="card" data-sv="${k}" style="text-align:left;gap:2px"><b>${esc(x.t)}</b><span class="small muted">${esc(x.sub)}</span></button>`).join('')}
+      <p class="small muted" style="margin:0"><b>${money(gestPrecio)}</b> por trámite. Si no lo logramos, te devolvemos el dinero.</p>`, r => {
+      r.querySelectorAll('[data-sv]').forEach(b => b.onclick = () => openGestion(Object.assign({}, pre, { servicio: b.dataset.sv })));
+    });
+    return;
+  }
+  const X = GEST_SERV[sv];
   const tel = (() => { try { return localStorage.getItem('fs-tel') || ''; } catch (_) { return ''; } })();
   const falta = m => !m || !m.doc || !m.eps;
   const draw = (keep = {}) => {
     const m = member(mid);
-    openDialog(`${head('Te sacamos la cita')}
-      <p class="small" style="margin:0">Nuestro equipo pide la cita a la EPS por ti, por sus canales oficiales. Cuando la tengamos te avisamos y la agregas a tu agenda con un toque. <b>Valor: ${money(gestPrecio)}</b> por cita. Si no la conseguimos, te devolvemos el dinero.</p>
+    openDialog(`${head(X.t)}
+      <p class="small" style="margin:0">${sv === 'cita' ? 'Pedimos la cita a la EPS por sus canales oficiales. Cuando la tengamos te avisamos y la agregas a tu agenda con un toque.' : sv === 'radicar' ? 'Enviamos la orden a la EPS por sus canales oficiales para que la autoricen, y te avisamos el número de radicado y la respuesta.' : sv === 'historia' ? 'Pedimos la copia de la historia clínica a la institución. Si la historia no es tuya, puede que te pidamos una autorización firmada por la persona.' : 'Cuéntanos qué pasa y un asesor te ayuda con el trámite ante la EPS.'} <b>Valor: ${money(gestPrecio)}</b>. Si no lo logramos, te devolvemos el dinero.</p>
       <form id="gs-f" class="fields">
         <label class="f">¿Para quién?<select id="gs-m">${memberOptions(mid)}</select></label>
-        <label class="f">¿Qué cita necesita?<input id="gs-que" required value="${esc(keep.que ?? pre.que ?? '')}" placeholder="Ej.: Medicina general, Pediatría, Ortopedia"></label>
-        ${falta(m) ? `<div class="notice full" style="margin:0"><span>A ${esc(first(m))} le falta ${!m.doc && !m.eps ? 'el documento y la EPS' : !m.doc ? 'el número de documento' : 'la EPS'}. Lo necesitamos para pedir la cita.</span><button class="btn sm primary" type="button" id="gs-edit">Completar</button></div>`
+        <label class="f">${esc(X.que)}<input id="gs-que" required value="${esc(keep.que ?? pre.que ?? '')}" placeholder="${esc(X.ph)}"></label>
+        ${falta(m) ? `<div class="notice full" style="margin:0"><span>A ${esc(first(m))} le falta ${!m.doc && !m.eps ? 'el documento y la EPS' : !m.doc ? 'el número de documento' : 'la EPS'}. Lo necesitamos para hacer el trámite.</span><button class="btn sm primary" type="button" id="gs-edit">Completar</button></div>`
           : `<p class="small muted full" style="margin:0">${esc(m.nombre)} · ${esc(docLabel(m))} · ${esc(m.eps)}${m.regimen ? ' (' + esc(m.regimen) + ')' : ''}</p>`}
-        <label class="f">Ciudad o sede que prefieres<input id="gs-ciudad" value="${esc(keep.ciudad ?? (S.familia && S.familia.ciudad) ?? '')}" placeholder="Ej.: Armenia, sede norte"></label>
-        <label class="f">¿Cuándo puede ir?<input id="gs-disp" value="${esc(keep.disp || '')}" placeholder="Ej.: mañanas entre semana, cualquier día"></label>
+        <label class="f">${esc(X.lugar)}<input id="gs-ciudad" value="${esc(keep.ciudad ?? (S.familia && S.familia.ciudad) ?? '')}" placeholder="Ej.: Armenia, sede norte"></label>
+        ${X.disp ? `<label class="f">¿Cuándo puede ir?<input id="gs-disp" value="${esc(keep.disp || '')}" placeholder="Ej.: mañanas entre semana, cualquier día"></label>` : ''}
         <label class="f">Celular de contacto (WhatsApp)<input id="gs-tel" required inputmode="tel" value="${esc(keep.tel ?? tel)}" placeholder="300 123 4567"></label>
-        <label class="f full">Foto de la orden médica o autorización (si la tiene)<input type="file" id="gs-foto" accept="image/*"></label>
+        <label class="f full">${esc(X.foto)}<input type="file" id="gs-foto" accept="image/*"></label>
         <label class="f full">Algo más que debamos saber (opcional)<textarea id="gs-notas" placeholder="Ej.: es control de un examen, prefiere doctora, la EPS dice que no hay agenda…">${esc(keep.notas || '')}</textarea></label>
-        <label class="row full small" style="gap:8px;align-items:flex-start"><input type="checkbox" id="gs-ok" style="margin-top:3px"><span>Autorizo a Emnova (FamiliSalud) a usar estos datos para pedir la cita a la EPS en nombre de esta persona, según la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a>.</span></label>
-        <div class="dlg-foot full"><button class="btn" type="button" id="gs-x">Cancelar</button><button class="btn primary" type="submit" ${falta(m) ? 'disabled' : ''}>Pedir que me la saquen</button></div>
+        <label class="row full small" style="gap:8px;align-items:flex-start"><input type="checkbox" id="gs-ok" style="margin-top:3px"><span>Autorizo a Emnova (FamiliSalud) a usar estos datos para hacer este trámite ante la EPS o la institución de salud en nombre de esta persona, según la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a>.</span></label>
+        <div class="dlg-foot full"><button class="btn" type="button" id="gs-x">Cancelar</button><button class="btn primary" type="submit" ${falta(m) ? 'disabled' : ''}>Pedir ayuda del asesor</button></div>
       </form>`, r => {
-      const keepNow = () => ({ que: val(r, 'gs-que'), ciudad: val(r, 'gs-ciudad'), disp: val(r, 'gs-disp'), tel: val(r, 'gs-tel'), notas: val(r, 'gs-notas') });
+      const keepNow = () => ({ que: val(r, 'gs-que'), ciudad: val(r, 'gs-ciudad'), disp: r.querySelector('#gs-disp') ? val(r, 'gs-disp') : '', tel: val(r, 'gs-tel'), notas: val(r, 'gs-notas') });
       r.querySelector('#gs-m').onchange = e => { const k = keepNow(); mid = e.target.value; draw(k); };
       r.querySelector('#gs-x').onclick = () => dlg.close();
       r.querySelector('#gs-edit')?.addEventListener('click', () => openMember(mid));
@@ -1358,12 +1378,13 @@ function openGestion(pre = {}) {
       r.querySelector('#gs-f').onsubmit = async e => {
         e.preventDefault();
         if (!r.querySelector('#gs-ok').checked) { toast('Marca la autorización para continuar.'); return; }
+        if (X.req && !foto) { toast('Agrega la foto de la orden médica.'); return; }
         const m = member(mid), btn = r.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Enviando…';
         try { localStorage.setItem('fs-tel', val(r, 'gs-tel')); } catch (_) {}
         try {
-          const j = await gestPost({ accion: 'crear', persona: { id: m.id, nombre: m.nombre, tipoDoc: m.tipoDoc || 'CC', doc: m.doc, eps: m.eps, regimen: m.regimen || '', nac: m.nac || '' }, que: val(r, 'gs-que'), ciudad: val(r, 'gs-ciudad'), disponibilidad: val(r, 'gs-disp'), telefono: val(r, 'gs-tel'), notas: val(r, 'gs-notas'), autoriza: true, foto });
+          const j = await gestPost({ accion: 'crear', servicio: sv, persona: { id: m.id, nombre: m.nombre, tipoDoc: m.tipoDoc || 'CC', doc: m.doc, eps: m.eps, regimen: m.regimen || '', nac: m.nac || '' }, que: val(r, 'gs-que'), ciudad: val(r, 'gs-ciudad'), disponibilidad: r.querySelector('#gs-disp') ? val(r, 'gs-disp') : '', telefono: val(r, 'gs-tel'), notas: val(r, 'gs-notas'), autoriza: true, foto });
           gest.unshift(j.gestion); openGestDetail(j.gestion.id, true);
-        } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = 'Pedir que me la saquen'; }
+        } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = 'Pedir ayuda del asesor'; }
       };
     });
   };
@@ -1373,16 +1394,19 @@ function openGestDetail(id, nueva) {
   const g = gest.find(x => x.id === id); if (!g) return;
   const [t, cls] = GEST_TXT[g.estado];
   const email = acct && acct.email || '';
-  const msg = `Hola, pagué ${money(g.precio)} para que FamiliSalud me saque la cita de ${g.que} para ${g.persona.nombre}. Mi correo es ${email}. Adjunto el comprobante.`;
-  openDialog(`${head(nueva ? '¡Solicitud enviada!' : 'Cita que sacamos por ti')}
-    <div class="card" style="gap:4px"><span class="row"><b class="grow">${esc(g.que)}</b><span class="badge ${cls}">${t}</span></span><span class="small muted">${esc(g.persona.nombre)} · ${esc(g.persona.eps)} · pedida el ${fmtDate(g.creada.slice(0, 10))}</span></div>
-    ${g.estado === 'pago' ? `<p style="margin:0">Para empezar a gestionarla, paga <b>${money(g.precio)}</b>. Apenas veamos el pago te avisamos y empezamos.</p>
-      <div class="card" style="gap:10px;border-color:var(--accent)">${payBoxHTML(g.precio, PLAN.qrGestion, 'familisalud-cita')}<span class="chips">${PAGO.whatsapp ? `<a class="btn sm" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('share')} Comprobante por WhatsApp</a>` : ''}<a class="btn sm" href="mailto:${PAGO.correo}?subject=${encodeURIComponent('Pago cita FamiliSalud')}&body=${encodeURIComponent(msg)}">Comprobante por correo</a></span></div>
+  const sv = servDe(g), esCita = sv === 'cita';
+  const msg = `Hola, pagué ${money(g.precio)} a FamiliSalud por el trámite "${GEST_SERV[sv].t}: ${g.que}" para ${g.persona.nombre}. Mi correo es ${email}. Adjunto el comprobante.`;
+  openDialog(`${head(nueva ? '¡Solicitud enviada!' : 'Tu asesor FamiliSalud')}
+    <div class="card" style="gap:4px"><span class="small muted">${esc(GEST_SERV[sv].t)}</span><span class="row"><b class="grow">${esc(g.que)}</b><span class="badge ${cls}">${t}</span></span><span class="small muted">${esc(g.persona.nombre)} · ${esc(g.persona.eps)} · pedida el ${fmtDate(g.creada.slice(0, 10))}</span></div>
+    ${g.estado === 'pago' ? `<p style="margin:0">Para empezar, paga <b>${money(g.precio)}</b>. Apenas veamos el pago te avisamos y empezamos.</p>
+      <div class="card" style="gap:10px;border-color:var(--accent)">${payBoxHTML(g.precio, PLAN.qrGestion, 'familisalud-cita')}<span class="chips">${PAGO.whatsapp ? `<a class="btn sm" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('share')} Comprobante por WhatsApp</a>` : ''}<a class="btn sm" href="mailto:${PAGO.correo}?subject=${encodeURIComponent('Pago asesor FamiliSalud')}&body=${encodeURIComponent(msg)}">Comprobante por correo</a></span></div>
       <div class="dlg-foot"><button class="btn danger" id="gd-cancel">Cancelar solicitud</button><button class="btn primary" id="gd-ok">Listo</button></div>`
-    : g.estado === 'proceso' ? `<p style="margin:0">Recibimos tu pago y estamos pidiendo la cita a la EPS. Te llega una notificación cuando la tengamos${pushState.on ? '' : ' (activa los recordatorios en Familia > Ajustes para recibirla)'}.</p><div class="dlg-foot"><button class="btn primary" id="gd-ok">Entendido</button></div>`
+    : g.estado === 'proceso' ? `<p style="margin:0">Recibimos tu pago y un asesor ya está haciendo el trámite. Te llega una notificación cuando esté listo${pushState.on ? '' : ' (activa los recordatorios en Familia > Ajustes para recibirla)'}.</p><div class="dlg-foot"><button class="btn primary" id="gd-ok">Entendido</button></div>`
+    : g.estado === 'lista' && !esCita ? `<div class="answer" style="margin:0"><b style="color:var(--good)">${ic('check')} Trámite listo</b>${g.resultado && g.resultado.fecha ? `<p style="margin:4px 0 0">${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}</p>` : ''}${g.resultado && g.resultado.notas ? `<p style="margin:4px 0 0">${esc(g.resultado.notas)}</p>` : ''}${g.resultado && g.resultado.lugar ? `<p class="small" style="margin:4px 0 0">${esc(g.resultado.lugar)}</p>` : ''}</div>
+      <div class="dlg-foot"><button class="btn" id="gd-hide">Quitar de la lista</button>${g.resultado && g.resultado.fecha ? `<button class="btn primary" id="gd-add">${ic('plus')} Agregar a mi agenda</button>` : '<button class="btn primary" id="gd-ok">Entendido</button>'}</div>`
     : g.estado === 'lista' ? `<div class="answer" style="margin:0"><b style="color:var(--good)">${ic('check')} ${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}</b>${g.resultado.lugar ? `<p style="margin:4px 0 0">${esc(g.resultado.lugar)}</p>` : ''}${g.resultado.notas ? `<p class="small" style="margin:4px 0 0">${esc(g.resultado.notas)}</p>` : ''}</div>
       <div class="dlg-foot">${g.agregada ? '<button class="btn" id="gd-hide">Quitar de la lista</button>' : ''}<button class="btn primary" id="gd-add">${g.agregada ? 'Ya está en tu agenda' : ic('plus') + ' Agregar a mi agenda'}</button></div>`
-    : `<p style="margin:0">${esc(g.nota || 'No fue posible conseguir la cita.')}</p><p class="small muted" style="margin:0">Te devolvemos el dinero a la misma cuenta desde la que pagaste.</p><div class="dlg-foot"><button class="btn" id="gd-hide">Quitar de la lista</button><button class="btn primary" id="gd-self">Pedirla yo mismo</button></div>`}`, r => {
+    : `<p style="margin:0">${esc(g.nota || 'No fue posible completar el trámite.')}</p><p class="small muted" style="margin:0">Te devolvemos el dinero a la misma cuenta desde la que pagaste.</p><div class="dlg-foot"><button class="btn" id="gd-hide">Quitar de la lista</button>${esCita ? '<button class="btn primary" id="gd-self">Pedirla yo mismo</button>' : '<button class="btn primary" id="gd-ok">Entendido</button>'}</div>`}`, r => {
     r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
     r.querySelector('#gd-ok')?.addEventListener('click', () => { dlg.close(); if (nueva) { view = 'salud'; salud = 'tramites'; render(); } });
     r.querySelector('#gd-cancel')?.addEventListener('click', () => openConfirm('¿Cancelar la solicitud?', 'Si ya pagaste, escríbenos antes de cancelar.', 'Cancelar solicitud', async () => { try { await gestPost({ accion: 'cancelar', id: g.id }); gest = gest.filter(x => x.id !== g.id); render(); toast('Solicitud cancelada'); } catch (e) { toast(e.message); } }));
@@ -1391,7 +1415,7 @@ function openGestDetail(id, nueva) {
     r.querySelector('#gd-add')?.addEventListener('click', () => {
       if (g.agregada) { dlg.close(); return; }
       const mid = member(g.persona.id) ? g.persona.id : (S.miembros.find(m => m.nombre === g.persona.nombre) || S.miembros[0]).id;
-      openCitaForm({ miembroId: mid, especialidad: g.que, fecha: g.resultado.fecha, hora: g.resultado.hora || '', lugar: g.resultado.lugar || '', notas: g.resultado.notas || '', gestionId: g.id });
+      openCitaForm({ miembroId: mid, especialidad: esCita ? g.que : `${GEST_SERV[sv].t}: ${g.que}`, fecha: g.resultado.fecha, hora: g.resultado.hora || '', lugar: g.resultado.lugar || '', notas: g.resultado.notas || '', gestionId: g.id });
     });
   });
 }
@@ -1441,7 +1465,7 @@ async function openAdmin() {
   };
   openDialog(`${head('Administración')}
     <div class="feat" id="ad-stats" style="grid-template-columns:repeat(3,minmax(0,1fr))">${stats()}</div>
-    <div class="seg" role="group" aria-label="Sección" id="ad-seg"><button aria-pressed="true" data-tab="c">Clientes</button><button aria-pressed="false" data-tab="g">Citas por sacar <span id="ad-gn"></span></button></div>
+    <div class="seg" role="group" aria-label="Sección" id="ad-seg"><button aria-pressed="true" data-tab="c">Clientes</button><button aria-pressed="false" data-tab="g">Asesorías <span id="ad-gn"></span></button></div>
     <div id="ad-tc" style="display:grid;gap:12px">
     <p class="small muted" style="margin:0">Activa el plan solo cuando veas el pago en tu Nequi. Cada cambio se guarda al instante y el cliente lo ve al volver a abrir la app. Al activar el primer pago de una familia invitada, quien la invitó gana 1 mes automáticamente.</p>
     <label class="f">Buscar por correo<input id="ad-q" inputmode="email" autocomplete="off"></label>
@@ -1470,15 +1494,17 @@ function adminGestiones(r) {
   let G = [], abierto = null;
   const box = r.querySelector('#ad-tg');
   r.querySelector('#ad-seg').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; r.querySelectorAll('#ad-seg [data-tab]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); r.querySelector('#ad-tc').style.display = b.dataset.tab === 'c' ? 'grid' : 'none'; box.style.display = b.dataset.tab === 'g' ? 'grid' : 'none'; });
-  const datos = g => `${g.persona.nombre}\n${g.persona.tipoDoc} ${g.persona.doc}\nEPS: ${g.persona.eps}${g.persona.regimen ? ' (' + g.persona.regimen + ')' : ''}${g.persona.nac ? '\nNacimiento: ' + g.persona.nac : ''}\nCita: ${g.que}\nCiudad/sede: ${g.ciudad || '—'}\nDisponibilidad: ${g.disponibilidad || '—'}\nContacto: ${g.telefono}${g.notas ? '\nNotas: ' + g.notas : ''}`;
+  const datos = g => `Trámite: ${GEST_SERV[servDe(g)].t}
+${g.persona.nombre}\n${g.persona.tipoDoc} ${g.persona.doc}\nEPS: ${g.persona.eps}${g.persona.regimen ? ' (' + g.persona.regimen + ')' : ''}${g.persona.nac ? '\nNacimiento: ' + g.persona.nac : ''}\n${GEST_SERV[servDe(g)].que} ${g.que}\nCiudad/sede: ${g.ciudad || '—'}\nDisponibilidad: ${g.disponibilidad || '—'}\nContacto: ${g.telefono}${g.notas ? '\nNotas: ' + g.notas : ''}`;
   const card = g => { const [t, cls] = GEST_TXT[g.estado]; const tel = g.telefono.replace(/\D/g, ''); const wa = tel.length === 10 ? '57' + tel : tel;
-    return `<div class="card" style="gap:8px" data-gk="${esc(g.famId)}|${esc(g.id)}"><div class="row"><b class="grow">${esc(g.que)} · ${esc(g.persona.nombre)}</b><span class="badge ${cls}">${t}</span></div>
+    const esCita = servDe(g) === 'cita';
+    return `<div class="card" style="gap:8px" data-gk="${esc(g.famId)}|${esc(g.id)}"><div class="row"><b class="grow">${esCita ? '' : esc(GEST_SERV[servDe(g)].t) + ': '}${esc(g.que)} · ${esc(g.persona.nombre)}</b><span class="badge ${cls}">${t}</span></div>
       <span class="small" style="white-space:pre-line">${esc(datos(g))}\nCuenta: ${esc(g.email)} · pedida el ${fmtDate(g.creada.slice(0, 10))} · ${money(g.precio)}</span>
-      ${g.resultado && g.estado === 'lista' ? `<span class="small"><b>Asignada:</b> ${fmtLong(g.resultado.fecha)} ${g.resultado.hora ? fmtHora(g.resultado.hora) : ''} · ${esc(g.resultado.lugar || '')}</span>` : ''}
+      ${g.resultado && g.estado === 'lista' ? `<span class="small"><b>Resultado:</b> ${g.resultado.fecha ? fmtLong(g.resultado.fecha) + ' ' + (g.resultado.hora ? fmtHora(g.resultado.hora) : '') + ' · ' : ''}${esc(g.resultado.lugar || '')} ${esc(g.resultado.notas || '')}</span>` : ''}
       <div class="chips"><button class="btn sm" data-g="copiar">${ic('copy')} Copiar datos</button>${g.tieneFoto && g.estado !== 'lista' && g.estado !== 'no' ? '<button class="btn sm" data-g="foto">Ver orden</button>' : ''}<a class="btn sm" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a><a class="btn sm" href="tel:${esc(g.telefono)}">Llamar</a></div>
-      <div class="chips">${g.estado === 'pago' ? '<button class="btn sm primary" data-g="proceso">Pago recibido: empezar</button>' : ''}${g.estado === 'proceso' || g.estado === 'pago' ? '<button class="btn sm primary" data-g="abrir-lista">Cita conseguida</button><button class="btn sm danger" data-g="abrir-no">No se pudo</button>' : ''}</div>
-      ${abierto === g.id + 'lista' ? `<div class="fields"><label class="f">Fecha<input type="date" id="ag-fecha"></label><label class="f">Hora<input type="time" id="ag-hora"></label><label class="f full">Lugar<input id="ag-lugar" placeholder="Clínica, sede y consultorio"></label><label class="f full">Notas para la familia<input id="ag-notas" placeholder="Ej.: llegar 20 min antes con la orden"></label><button class="btn primary full" data-g="lista">Guardar y avisar a la familia</button></div>` : ''}
-      ${abierto === g.id + 'no' ? `<div class="fields"><label class="f full">Mensaje para la familia<textarea id="ag-nota">No fue posible conseguir la cita porque la EPS no tiene agenda disponible. Te devolvemos el dinero.</textarea></label><button class="btn danger full" data-g="no">Guardar y avisar</button></div>` : ''}
+      <div class="chips">${g.estado === 'pago' ? '<button class="btn sm primary" data-g="proceso">Pago recibido: empezar</button>' : ''}${g.estado === 'proceso' || g.estado === 'pago' ? `<button class="btn sm primary" data-g="abrir-lista">${esCita ? 'Cita conseguida' : 'Trámite listo'}</button><button class="btn sm danger" data-g="abrir-no">No se pudo</button>` : ''}</div>
+      ${abierto === g.id + 'lista' ? `<div class="fields"><label class="f">Fecha${esCita ? '' : ' (si aplica)'}<input type="date" id="ag-fecha"></label><label class="f">Hora<input type="time" id="ag-hora"></label><label class="f full">Lugar${esCita ? '' : ' (si aplica)'}<input id="ag-lugar" placeholder="Clínica, sede y consultorio"></label><label class="f full">${esCita ? 'Notas para la familia' : 'Resultado para la familia'}<input id="ag-notas" placeholder="${esCita ? 'Ej.: llegar 20 min antes con la orden' : 'Ej.: Radicado N.° 12345. La EPS responde en 5 días.'}"></label><button class="btn primary full" data-g="lista">Guardar y avisar a la familia</button></div>` : ''}
+      ${abierto === g.id + 'no' ? `<div class="fields"><label class="f full">Mensaje para la familia<textarea id="ag-nota">${esCita ? 'No fue posible conseguir la cita porque la EPS no tiene agenda disponible.' : 'No fue posible completar el trámite.'} Te devolvemos el dinero.</textarea></label><button class="btn danger full" data-g="no">Guardar y avisar</button></div>` : ''}
     </div>`; };
   const draw = () => { const n = G.filter(g => g.estado === 'pago' || g.estado === 'proceso').length; r.querySelector('#ad-gn').textContent = n ? `(${n})` : ''; box.innerHTML = G.length ? G.map(card).join('') : '<span class="muted">Aún no hay solicitudes.</span>'; };
   const post = async (g, body) => { const res = await fetch('/api/gestion?admin=1', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(Object.assign({ famId: g.famId, id: g.id }, body)) }); const k = await res.json().catch(() => ({})); if (!res.ok) throw new Error(k.error || 'No se pudo guardar.'); Object.assign(g, k.gestion); };
@@ -1635,6 +1661,9 @@ const NMIP = ['Minsalud: MIPRES', 'https://www2.minsalud.gov.co/sites/rid/Lists/
 const NSUPER = ['Superintendencia de Salud', 'https://www.supersalud.gov.co'];
 const NCONST = ['Constitución, artículo 86', 'https://www.secretariasenado.gov.co/senado/basedoc/constitucion_politica_1991.html'];
 const GUIAS = [
+  { id: 'radicar', titulo: 'Me piden radicar la orden o la autorización', resumen: 'Por norma, la clínica o la EPS deben hacer ese trámite, no tú.',
+    derechos: ['Desde mayo de 2025, el Ministerio de Salud y la Superintendencia de Salud prohíben ponerle al paciente cargas para presentar órdenes o tramitar y renovar autorizaciones: la gestión debe hacerse sin tu participación (Circular Conjunta 019 de 2025).', 'Quien te atiende (IPS o clínica) debe hacer el trámite de autorización directamente con la EPS.', 'Para adultos mayores, personas con discapacidad y gestantes, la respuesta debe llegar en máximo 2 días hábiles; para los demás, en máximo 5 días calendario.', 'Urgencias, cáncer, VIH y los servicios de las rutas de atención no requieren autorización previa.'],
+    pasos: ['Si te piden radicar, di con calma que la Circular 019 de 2025 obliga a la clínica o la EPS a gestionar la autorización', 'Pide que te den por escrito o por mensaje quién la está tramitando y cuándo responden', 'Si de todas formas te toca enviarla, usa el canal oficial de la EPS (web, WhatsApp o app) y guarda el número de radicado', 'Si pasa el plazo sin respuesta, pon una queja (PQRD) en la EPS citando la Circular 019 de 2025', 'Si no responden, pon la queja ante la Superintendencia de Salud'], fuentes: [['Circular Conjunta 019 de 2025', 'https://normograma.supersalud.gov.co/compilacion/docs/circular_supersalud_0019_2025.htm'], ['Superintendencia de Salud', 'https://www.supersalud.gov.co']] },
   { id: 'demora', titulo: 'Me demoran la cita', resumen: 'Plazos que la EPS debe cumplir y qué hacer si no los cumple.',
     derechos: ['Medicina general y odontología general: la cita no puede asignarse a más de 3 días hábiles desde que la pides, salvo que tú pidas otra fecha (Res. 1552 de 2013, art. 1).', 'Especialistas: la EPS debe tener agendas abiertas todos los días hábiles del año y no puede negarse a recibir tu solicitud.', 'Si la cita necesita autorización previa, la EPS debe responder en máximo 5 días hábiles.', 'La EPS debe tener canales no presenciales para pedir citas, y publicar cada mes su tiempo promedio de espera.'],
     pasos: ['Pide la cita por el canal oficial y anota fecha, hora y número de radicado', 'Si pasa el plazo, vuelve a pedirla por otro canal de la EPS', 'Radica una queja (PQRD) ante la EPS citando la Resolución 1552 de 2013', 'Si no responde, pon la queja ante la Superintendencia de Salud', 'Si la demora pone en riesgo la salud, considera una tutela'], fuentes: [N1552, NSUPER] },
@@ -1670,7 +1699,9 @@ function openGuia(id) {
     <div><b>Paso a paso</b><ol style="margin:6px 0 0;padding-left:1.2em;display:grid;gap:4px">${g.pasos.map(p => `<li class="small">${esc(p)}</li>`).join('')}</ol></div>
     <div class="small muted">Fuentes: ${g.fuentes.map(([l, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`).join(' · ')}. Guía general, no es asesoría legal.</div>
     ${S.miembros.length ? `<label class="f">¿Para quién es este trámite?<select id="gu-m">${memberOptions()}</select></label>` : ''}
-    <div class="dlg-foot">${id === 'demora' ? '<button class="btn" id="gu-ped">Ver canales de la EPS</button>' : ''}${S.miembros.length ? '<button class="btn primary" id="gu-go">Empezar este trámite</button>' : ''}</div>`, r => {
+    ${mode === 'netlify' && S.miembros.length ? `<button class="card" id="gu-ase" style="grid-template-columns:auto 1fr;column-gap:12px;align-items:center;border-color:var(--accent);text-align:left"><span class="opt-ic">${ic('check')}</span><span><b>¿Prefieres que lo haga un asesor?</b><br><span class="small muted">Una persona real hace este trámite por ti. ${money(gestPrecio)}.</span></span></button>` : ''}
+    <div class="dlg-foot">${id === 'demora' ? '<button class="btn" id="gu-ped">Ver canales de la EPS</button>' : ''}${S.miembros.length ? '<button class="btn primary" id="gu-go">Lo hago yo: guiarme</button>' : ''}</div>`, r => {
+    r.querySelector('#gu-ase')?.addEventListener('click', () => openGestion({ miembroId: val(r, 'gu-m'), servicio: id === 'radicar' ? 'radicar' : id === 'demora' ? 'cita' : 'otro', que: id === 'radicar' || id === 'demora' ? '' : g.titulo }));
     r.querySelector('#gu-ped')?.addEventListener('click', () => openPedir({ miembroId: val(r, 'gu-m') }));
     r.querySelector('#gu-go')?.addEventListener('click', () => {
       S.sols.push({ id: uid(), miembroId: val(r, 'gu-m'), que: g.titulo, canal: 'guía', fecha: todayISO(), estado: 'esperando', radicado: '', guia: g.id, pasos: g.pasos.map(t => ({ t, ok: false })) });
@@ -1741,7 +1772,7 @@ function openPlus() {
   const opt = (id, icon, t, sub, primary) => `<button class="card" id="${id}" style="grid-template-columns:auto 1fr;column-gap:14px;align-items:center${primary ? ';border-color:var(--accent)' : ''}"><span class="opt-ic">${ic(icon)}</span><span><b>${t}</b><br><span class="small muted">${sub}</span></span></button>`;
   openDialog(`${head('¿Qué necesitas hacer?')}
     ${opt('pl-pedir', 'cal', 'Pedir una cita', 'Te mostramos cómo pedirla en tu EPS y qué decir.', true)}
-    ${mode === 'netlify' ? opt('pl-gest', 'check', 'Que FamiliSalud me saque la cita', `Nosotros la pedimos a la EPS por ti. ${money(gestPrecio)}.`) : ''}
+    ${mode === 'netlify' ? opt('pl-gest', 'check', 'Que un asesor lo haga por mí', `Citas, órdenes, historia clínica y otros trámites. ${money(gestPrecio)}.`) : ''}
     ${opt('pl-part', 'spark', 'Buscar una cita particular', 'Opciones con precio y calificaciones, y cómo verificar al médico.')}
     ${opt('pl-cita', 'check', 'Ya tengo una cita: guardarla', 'Fecha, hora, lugar y qué llevar.')}
     ${photoOn() ? opt('pl-foto', 'doc', 'Leer una foto o mensaje de la EPS', 'Toma foto a la orden o pega el SMS y llenamos la cita.') : ''}
@@ -1795,7 +1826,7 @@ function openPedir(pre = {}) {
       r.querySelectorAll('[data-ch]').forEach(a => a.addEventListener('click', () => { lastCh = a.dataset.ch; }));
       r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
       r.querySelector('#pd-copy').onclick = () => copyText(r.querySelector('#pd-script').textContent);
-      r.querySelector('#pd-gest')?.addEventListener('click', () => openGestion({ miembroId: mid, que: val(r, 'pd-que') }));
+      r.querySelector('#pd-gest')?.addEventListener('click', () => openGestion({ miembroId: mid, que: val(r, 'pd-que'), servicio: 'cita' }));
       r.querySelector('#pd-part').onclick = () => openParticular({ miembroId: mid, especialidad: val(r, 'pd-que') });
       r.querySelector('#pd-got').onclick = () => openCitaForm({ miembroId: mid, especialidad: val(r, 'pd-que') || pre.especialidad || '', controlId: pre.controlId, autId: pre.autId, fecha: addDays(todayISO(), 1) });
       r.querySelector('#pd-wait').onclick = () => {

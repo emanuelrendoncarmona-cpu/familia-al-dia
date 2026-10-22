@@ -23,7 +23,13 @@ export default async () => {
   const cuentas = stores.cuentas();
   const { blobs } = await cuentas.list();
   let avisos = 0, borrados = 0, reactivadas = 0;
-  for (const { key } of blobs) {
+  // Si hay muchas cuentas, revisa por tandas: retoma donde quedó el día anterior (límite de tiempo de 30 s).
+  const aj = stores.ajustes(); const desde = String((await aj.get("limpieza-cursor")) || "");
+  const keys = blobs.map(b => b.key).sort(); const ini = keys.findIndex(k => k > desde); const orden = ini > 0 ? [...keys.slice(ini), ...keys.slice(0, ini)] : keys;
+  const t0 = Date.now(); let ultimo = "";
+  for (const key of orden) {
+    if (Date.now() - t0 > 22000) { await aj.set("limpieza-cursor", ultimo); console.log("[limpieza] continúa mañana desde", ultimo); break; }
+    ultimo = key;
     const c = (await cuentas.get(key, { type: "json" })) as Cuenta | null;
     if (!c || c.borrado) continue;
     const est = estadoCuenta(c);
