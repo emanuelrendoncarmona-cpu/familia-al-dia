@@ -1,7 +1,7 @@
 // /api/gestion — "Asesor FamiliSalud": la familia paga para que una persona del equipo haga un trámite con la EPS (sacar cita, radicar orden, pedir historia clínica u otro).
 // Flujo: pago → proceso (pago recibido) → [radicado (esperando respuesta de la EPS, con plazo legal)] → lista | no (se devuelve el dinero).
 import type { Config } from "@netlify/functions";
-import { requireUser, isAdmin, stores, json, resolveFamily, PRECIOS, registrarIngreso } from "../../lib/common.mts";
+import { requireUser, isAdmin, stores, json, resolveFamily, PRECIOS, PRECIOS_GESTION, registrarIngreso } from "../../lib/common.mts";
 import { SERVICIOS, avisar, txt, plazoRespuesta, type Estado, type Servicio, type Gestion } from "../../lib/gestiones.mts";
 
 const nuevoId = () => { const b = new Uint8Array(9); crypto.getRandomValues(b); return Array.from(b, x => x.toString(16).padStart(2, "0")).join(""); };
@@ -83,7 +83,7 @@ export default async (req: Request) => {
     const { blobs } = await gs.list({ prefix });
     const list = (await Promise.all(blobs.map(b => gs.get(b.key, { type: "json" })))).filter(Boolean) as Gestion[];
     list.sort((a, b) => b.creada.localeCompare(a.creada));
-    return json({ gestiones: list.slice(0, 40).map(publica), precio: PRECIOS.gestion });
+    return json({ gestiones: list.slice(0, 40).map(publica), precio: PRECIOS.gestion, precios: PRECIOS_GESTION });
   }
 
   if (req.method !== "POST") return json({ error: "Método no permitido" }, 405);
@@ -94,7 +94,7 @@ export default async (req: Request) => {
     const p = body.persona || {};
     const servicio: Servicio = (Object.keys(SERVICIOS) as Servicio[]).includes(body.servicio) ? body.servicio : "cita";
     const g: Gestion = {
-      id: nuevoId(), famId: fam.id, userId: user.id, email: user.email || "", creada: new Date().toISOString(), actualizada: new Date().toISOString(), estado: "pago", precio: PRECIOS.gestion, servicio,
+      id: nuevoId(), famId: fam.id, userId: user.id, email: user.email || "", creada: new Date().toISOString(), actualizada: new Date().toISOString(), estado: "pago", precio: PRECIOS_GESTION[servicio] || PRECIOS.gestion, servicio,
       persona: { id: txt(p.id, 40), nombre: txt(p.nombre, 100), tipoDoc: txt(p.tipoDoc, 10), doc: txt(p.doc, 20), eps: txt(p.eps, 80), regimen: txt(p.regimen, 20), nac: txt(p.nac, 10) },
       que: txt(body.que, 120), ciudad: txt(body.ciudad, 80), disponibilidad: txt(body.disponibilidad, 200), telefono: txt(body.telefono, 20), notas: txt(body.notas, 500), tieneFoto: false,
       correoEntrega: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(body.correoEntrega || "")) ? txt(body.correoEntrega, 120) : "",
@@ -119,7 +119,7 @@ export default async (req: Request) => {
     }
     await gs.setJSON(prefix + g.id, g);
     const adm = ((await stores.ajustes().get("admins", { type: "json" })) as { ids: string[] } | null)?.ids || [];
-    await avisar(adm, { title: `Nueva solicitud: ${SERVICIOS[servicio]}`, body: `${g.que} para ${g.persona.nombre} (${g.persona.eps}). Espera el pago de $${PRECIOS.gestion.toLocaleString("es-CO")}.`, tag: "admin-gestion", url: "/" });
+    await avisar(adm, { title: `Nueva solicitud: ${SERVICIOS[servicio]}`, body: `${g.que} para ${g.persona.nombre} (${g.persona.eps}). Espera el pago de $${g.precio.toLocaleString("es-CO")}.`, tag: "admin-gestion", url: "/" });
     return json({ ok: true, gestion: g });
   }
 

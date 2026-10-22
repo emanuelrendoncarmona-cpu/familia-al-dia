@@ -37,7 +37,9 @@ export async function indexarAgenda(famId: string, agenda: any) {
 }
 
 // Precios en pesos (los muestra la app; el plan se activa a mano desde el panel al ver el pago).
-export const PRECIOS = { mensual: 14900, anual: 149000, gestion: 19900 };
+export const PRECIOS = { mensual: 14900, anual: 149000, gestion: 5000 }; // gestion = precio "desde"
+// Asesor FamiliSalud: precio según la dificultad del trámite.
+export const PRECIOS_GESTION: Record<string, number> = { cita: 5000, radicar: 8000, traslado: 8000, historia: 10000, otro: 10000 };
 
 // Uso justo del asistente con IA por familia y por mes (cada consulta gasta créditos de Netlify).
 export const USO_MES = { asistente: 150, busqueda: 15 };
