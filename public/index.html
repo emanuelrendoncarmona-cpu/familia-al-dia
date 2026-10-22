@@ -325,7 +325,7 @@ const TIPOS = {
 };
 // Canales oficiales verificados en el sitio de cada EPS el 20 de octubre de 2026. Cambian seguido: revisar cada mes.
 const EPS_VERIFIED = 'oct 2026';
-const EPS = [
+const EPS_BASE = [
   { k: 'nueva', n: 'Nueva EPS', match: /nueva\s*eps/i, web: ['Pedir cita en línea', 'https://solucionjb.nuevaeps.com.co/NEPS_Citasweb-1.0-SNAPSHOT/login.xhtml'], app: ['App Afiliados', 'https://app.nuevaeps.com.co/#/'], wa: '573214459657', waName: 'EVA', tels: { contributivo: [['Nacional', '018000954400'], ['Bogotá', '6013077022']], subsidiado: [['Nacional', '018000952000'], ['Bogotá', '6013077051']] }, more: 'https://www.nuevaeps.com.co/personas/canales-no-presenciales-ecosistema-de-servicios' },
   { k: 'sanitas', n: 'EPS Sanitas', match: /sanitas/i, web: ['Citas médicas en línea', 'https://www.epssanitas.com/usuarios/web/nuevo-portal-eps/citas-medicas'], app: ['App EPS Sanitas (Android)', 'https://play.google.com/store/apps/details?id=colsanitas.foonkiemonkey.com.co.eps'], app2: ['App EPS Sanitas (iPhone)', 'https://itunes.apple.com/co/app/eps-sanitas/id960869433?mt=8'], wa: '573202550525', waName: 'Ana María', tels: [['Bogotá', '6013759000'], ['Medellín', '6045908383'], ['Cali', '6023989340'], ['Barranquilla', '6053226888'], ['Nacional (fijo)', '018000919100'], ['Desde celular', '#936']] },
   { k: 'sura', n: 'EPS Sura', match: /sura/i, web: ['Pedir cita (con tu clave)', 'https://www.epssura.com/afiliados'], extra: ['Sacar la clave de afiliado', 'https://solicitudes.sura.com/SS/Register/Eps/UsersRegistration.aspx?&cdMod=EMP'], tels: [['Armenia (Quindío)', '6067314936'], ['Pereira (Risaralda)', '6063251999'], ['Manizales (Caldas)', '6068859515'], ['Medellín (Antioquia)', '6044486115'], ['Bogotá', '6014897941'], ['Cali', '6023808941'], ['Barranquilla', '6053197901'], ['Cartagena', '6056424946'], ['Bucaramanga', '6076917941'], ['Apartadó', '6048288233'], ['Resto del país', '018000519519']] },
@@ -356,7 +356,29 @@ const EPS = [
 ];
 const ADRES_URL = 'https://aplicaciones.adres.gov.co/BDUA_Internet/Pages/ConsultarAfiliadoWeb_2.aspx';
 const SUPERSALUD_URL = 'https://www.supersalud.gov.co';
+// Directorio vivo: empieza con el que trae la app y se reemplaza por el que edita el administrador (/api/eps).
+const escRe = t => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+function epsRegex(e) {
+  const alias = String(e.alias || '').split(',').map(x => x.trim()).filter(x => x.length > 2).map(escRe);
+  try { return new RegExp([e.patron || escRe(e.n), ...alias].join('|'), 'i'); } catch (_) { return new RegExp(escRe(e.n), 'i'); }
+}
+let EPS = EPS_BASE.map(e => Object.assign({ estado: 'activa', patron: e.match.source }, e));
+let epsVersion = 0;
+function aplicarDirectorio(d) {
+  if (!d || !Array.isArray(d.lista) || !d.lista.length) return false;
+  EPS = d.lista.map(e => Object.assign({}, e, { match: epsRegex(e), tels: e.tels || [] }));
+  epsVersion = d.version || 0; return true;
+}
+try { aplicarDirectorio(JSON.parse(localStorage.getItem('fs-eps') || 'null')); } catch (_) {}
+async function cargarDirectorio() {
+  try {
+    const r = await fetch('/api/eps', { credentials: 'same-origin' }); if (!r.ok) return; const d = await r.json();
+    if (d.lista && d.version !== epsVersion && aplicarDirectorio(d)) { try { localStorage.setItem('fs-eps', JSON.stringify(d)); } catch (_) {} if (!dlg.open) render(); }
+  } catch (_) {}
+}
+const epsSerial = e => { const o = Object.assign({}, e); delete o.match; return o; };
 const epsOf = m => m && m.eps ? EPS.find(e => e.match.test(m.eps)) || null : null;
+const epsPorK = k => EPS.find(e => e.k === k) || null;
 const fmtTel = t => t.startsWith('#') ? t : t.startsWith('01800') ? t.replace(/^(01)(8000)(\d{3})(\d{3})$/, '$1 $2 $3 $4') : t.replace(/^(\d{3})(\d{3})(\d{4})$/, '($1) $2 $3');
 const ESTADOS = { pendiente: 'Pendiente', confirmada: 'Confirmada', asistida: 'Asistida', cancelada: 'Cancelada', perdida: 'Perdida' };
 const ACTIVE = c => ['pendiente', 'confirmada'].includes(c.estado);
@@ -585,7 +607,7 @@ async function loadCloud() {
   if (j.agenda) S.version = j.agenda.version || 0;
   setStatus(); render();
   checkPush().then(() => { if (!dlg.open) render(); });
-  loadGest();
+  loadGest(); cargarDirectorio();
   let ref = null; try { ref = localStorage.getItem('fs-ref'); } catch (_) {}
   if (ref && acct && acct.puedeReferido) {
     fetch('/api/data', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accion: 'referido', code: ref }) })
@@ -722,6 +744,7 @@ function alerts() {
     else if (g.estado === 'pago') out.push({ lvl: 'info', k: 'clock', title: `Falta tu pago · ${esCita ? 'cita de ' : ''}${g.que}`, sub: `Paga ${money(g.precio)} para que el asesor empiece.`, act: ['Pagar', () => openGestDetail(g.id)], top: true });
     else if (g.estado === 'no') out.push({ lvl: 'warn', k: 'alert', title: `No pudimos completar: ${g.que}`, sub: 'Te devolvemos el dinero. Mira las opciones.', act: ['Ver', () => openGestDetail(g.id)], top: true });
   });
+  S.miembros.forEach(m => { const e = epsOf(m); if (e && e.estado && e.estado !== 'activa') { const dst = epsPorK(e.destino); out.push({ lvl: 'crit', k: 'alert', title: `La EPS de ${first(m)} (${e.n}) ${e.estado === 'liquidada' ? 'fue liquidada' : 'se retiró de varias zonas'}`, sub: dst ? `Sus afiliados pasan a ${dst.n}. Confírmalo y actualízala.` : 'Confirma en ADRES a qué EPS quedó.', act: ['Ver', () => openEpsCambio(m.id)], top: true }); } });
   const rank = { crit: 0, warn: 1, info: 2 };
   return out.sort((a, b) => (b.top ? 1 : 0) - (a.top ? 1 : 0) || rank[a.lvl] - rank[b.lvl]);
 }
@@ -1179,7 +1202,7 @@ function openMember(id) {
       <label class="f full">Nombre<input id="mm-n" value="${esc(m.nombre || '')}" placeholder="Nombre y apellido"></label>
       <label class="f">Parentesco<input id="mm-p" value="${esc(m.parentesco || '')}" placeholder="Yo, hija, mamá…" list="parentescos"><datalist id="parentescos"><option>Yo</option><option>Pareja</option><option>Hija</option><option>Hijo</option><option>Mamá</option><option>Papá</option><option>Abuela</option><option>Abuelo</option></datalist></label>
       <label class="f">Fecha de nacimiento<input type="date" id="mm-nac" value="${esc(m.nac || '')}"></label>
-      <label class="f">EPS<input id="mm-eps" value="${esc(m.eps || '')}" list="eps-list" placeholder="Escribe o elige"><datalist id="eps-list">${EPS.map(e => `<option>${esc(e.n)}</option>`).join('')}</datalist></label>
+      <label class="f">EPS<input id="mm-eps" value="${esc(m.eps || '')}" list="eps-list" placeholder="Escribe o elige"><datalist id="eps-list">${EPS.filter(e => !e.estado || e.estado === 'activa').map(e => `<option>${esc(e.n)}</option>`).join('')}</datalist></label>
       <label class="f">Régimen<select id="mm-reg"><option value="">No sé</option><option value="contributivo" ${m.regimen === 'contributivo' ? 'selected' : ''}>Contributivo</option><option value="subsidiado" ${m.regimen === 'subsidiado' ? 'selected' : ''}>Subsidiado</option><option value="especial" ${m.regimen === 'especial' ? 'selected' : ''}>Especial (militar, policía, magisterio)</option></select></label>
       <label class="f">Ciudad donde se atiende<input id="mm-ciudad" value="${esc(m.ciudad || '')}" list="mm-ciudades" placeholder="${esc((S.familia && S.familia.ciudad) || 'Ej.: Armenia')}"><datalist id="mm-ciudades">${CIUDADES.map(c => `<option>${esc(c)}</option>`).join('')}</datalist></label>
       <label class="f">Tipo de documento<select id="mm-tipodoc">${Object.entries(TIPODOC).map(([k, t]) => `<option value="${k}" ${((m.tipoDoc || 'CC') === k) ? 'selected' : ''}>${k} · ${t}</option>`).join('')}</select></label>
@@ -1198,6 +1221,7 @@ function openMember(id) {
       const n = val(r, 'mm-n'); if (!n) { r.querySelector('#mm-n').focus(); toast('Falta el nombre'); return; }
       const data = { nombre: n, parentesco: val(r, 'mm-p'), nac: val(r, 'mm-nac'), eps: val(r, 'mm-eps'), regimen: val(r, 'mm-reg'), tipoDoc: val(r, 'mm-tipodoc'), doc: val(r, 'mm-doc'), ciudad: val(r, 'mm-ciudad'), alergias: val(r, 'mm-al'), notas: val(r, 'mm-no') };
       if (id) Object.assign(m, data); else S.miembros.push(Object.assign({ id: uid(), color: m.color }, data));
+      if (mode === 'netlify' && data.eps && !epsOf(data)) fetch('/api/eps', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accion: 'desconocida', nombre: data.eps }) }).catch(() => {});
       persist(); dlg.close(); render(); toast(id ? 'Datos actualizados' : `${n.split(' ')[0]} agregado a la familia`);
     };
   });
@@ -1543,13 +1567,14 @@ async function openAdmin() {
   };
   openDialog(`${head('Administración')}
     <div class="feat" id="ad-stats" style="grid-template-columns:repeat(3,minmax(0,1fr))">${stats()}</div>
-    <div class="seg" role="group" aria-label="Sección" id="ad-seg"><button aria-pressed="true" data-tab="c">Clientes</button><button aria-pressed="false" data-tab="g">Asesorías <span id="ad-gn"></span></button></div>
+    <div class="seg" role="group" aria-label="Sección" id="ad-seg"><button aria-pressed="true" data-tab="c">Clientes</button><button aria-pressed="false" data-tab="g">Asesorías <span id="ad-gn"></span></button><button aria-pressed="false" data-tab="e">EPS <span id="ad-en"></span></button></div>
     <div id="ad-tc" style="display:grid;gap:12px">
     <p class="small muted" style="margin:0">Activa el plan solo cuando veas el pago en tu Nequi. Cada cambio se guarda al instante y el cliente lo ve al volver a abrir la app. Al activar el primer pago de una familia invitada, quien la invitó gana 1 mes automáticamente.</p>
     <label class="f">Buscar por correo<input id="ad-q" inputmode="email" autocomplete="off"></label>
     <div style="display:grid;gap:8px" id="ad-list">${list()}</div></div>
-    <div id="ad-tg" style="display:none;gap:8px"><p class="muted" style="margin:0">Cargando…</p></div>`, r => {
-    adminGestiones(r);
+    <div id="ad-tg" style="display:none;gap:8px"><p class="muted" style="margin:0">Cargando…</p></div>
+    <div id="ad-te" style="display:none;gap:10px"><p class="muted" style="margin:0">Cargando…</p></div>`, r => {
+    adminGestiones(r); adminEps(r);
     const box = r.querySelector('#ad-list');
     const redraw = () => { box.innerHTML = list(); r.querySelector('#ad-stats').innerHTML = stats(); };
     r.querySelector('#ad-q').oninput = e => { filt = e.target.value.trim(); redraw(); };
@@ -1568,10 +1593,78 @@ async function openAdmin() {
   dlg.addEventListener('close', () => refreshCloud(true), { once: true });
 }
 
+function adminEps(r) {
+  const box = r.querySelector('#ad-te'); let info = null, editando = null, prefill = '';
+  const api = async body => { const res = await fetch('/api/eps', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); const k = await res.json().catch(() => ({})); if (!res.ok) throw new Error(k.error || 'No se pudo guardar.'); return k; };
+  const telsTxt = t => (t || []).map(([a, b]) => `${a} | ${b}`).join('\n');
+  const telsDe = t => t.split('\n').map(l => l.split('|').map(x => x.trim())).filter(x => x.length === 2 && x[1]).map(([a, b]) => [a, b.replace(/[^\d#+]/g, '')]);
+  const ESTADO = { activa: ['Activa', 'good'], liquidada: ['Liquidada', 'crit'], retirada: ['Retirada', 'warn'] };
+  const form = e => { const split = e.tels && !Array.isArray(e.tels);
+    return `<div class="card fields" style="border-color:var(--accent)">
+      <label class="f full">Nombre<input id="ep-n" value="${esc(e.n || '')}"></label>
+      <label class="f full">Otros nombres con que la escriben (separados por coma)<input id="ep-alias" value="${esc(e.alias || '')}" placeholder="Ej.: EPS del Valle, Delagente"></label>
+      <label class="f">Botón web: texto<input id="ep-wl" value="${esc(e.web ? e.web[0] : '')}" placeholder="Pedir cita en línea"></label><label class="f">Botón web: enlace<input id="ep-wu" value="${esc(e.web ? e.web[1] : '')}" placeholder="https://..."></label>
+      <label class="f">WhatsApp (con 57)<input id="ep-wa" inputmode="numeric" value="${esc(e.wa || '')}" placeholder="573001234567"></label><label class="f">Nombre del asistente<input id="ep-wan" value="${esc(e.waName || '')}"></label>
+      ${split ? `<label class="f full">Teléfonos contributivo (una por línea: Ciudad | número)<textarea id="ep-tc">${esc(telsTxt(e.tels.contributivo))}</textarea></label><label class="f full">Teléfonos subsidiado<textarea id="ep-ts">${esc(telsTxt(e.tels.subsidiado))}</textarea></label>`
+        : `<label class="f full">Teléfonos (una por línea: Ciudad o Nacional | número)<textarea id="ep-t" rows="5">${esc(telsTxt(e.tels))}</textarea></label>`}
+      <label class="f full">Nota para las familias (opcional)<input id="ep-nota" value="${esc(e.nota || '')}"></label>
+      <label class="f full">Página oficial de canales<input id="ep-more" value="${esc(e.more || '')}" placeholder="https://..."></label>
+      <label class="f">Estado<select id="ep-est">${Object.entries(ESTADO).map(([k, [l]]) => `<option value="${k}" ${(e.estado || 'activa') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="f">Sus afiliados pasan a<select id="ep-dst"><option value="">—</option>${EPS.filter(x => x.k !== e.k && (!x.estado || x.estado === 'activa')).map(x => `<option value="${esc(x.k)}" ${e.destino === x.k ? 'selected' : ''}>${esc(x.n)}</option>`).join('')}</select></label>
+      <label class="f full">Explicación del cambio (la ven las familias afectadas)<input id="ep-av" value="${esc(e.avisoNota || '')}" placeholder="Ej.: La Supersalud ordenó su liquidación el 1 de noviembre."></label>
+      <div class="row full" style="gap:8px">${e.k ? '<button class="btn sm danger" data-ep="quitar">Quitar del directorio</button>' : ''}<span class="grow"></span><button class="btn sm" data-ep="cancelar">Cancelar</button><button class="btn sm primary" data-ep="guardar">Guardar</button></div></div>`; };
+  const draw = () => {
+    if (!info) return;
+    const rev = info.revision, desc = Object.entries(info.desconocidas || {}).sort((a, b) => b[1].n - a[1].n);
+    r.querySelector('#ad-en').textContent = desc.length || (rev && rev.novedades && rev.novedades.length) ? '•' : '';
+    box.innerHTML = `<p class="small muted" style="margin:0">Lo que cambies aquí lo ven todas las familias al instante, sin publicar la app. Directorio versión ${info.version} · actualizado el ${fmtDate(String(info.actualizado).slice(0, 10))}.</p>
+      <div class="card" style="gap:6px"><div class="row"><b class="grow">Revisión automática</b><button class="btn sm" data-ep="revisar">Revisar ahora</button></div>
+        ${rev ? `<span class="small muted">Última: ${fmtDate(rev.fecha.slice(0, 10))} · ${rev.enlaces} enlaces revisados${rev.bloqueados ? ` (${rev.bloqueados} sitios no dejan revisar)` : ''}</span>
+          ${rev.rotos.length ? `<span class="small"><b>Enlaces que no abren:</b> ${rev.rotos.map(x => `${esc(x.eps)} (${esc(x.que)})`).join(', ')}</span>` : '<span class="small">Todos los enlaces abren.</span>'}
+          ${(rev.novedades || []).length ? rev.novedades.map(n => `<span class="small">• <b>${esc(n.eps)}</b> · ${esc(n.tipo)}: ${esc(n.resumen)} ${n.fuente && /^https?:/.test(n.fuente) ? `<a href="${esc(n.fuente)}" target="_blank" rel="noopener">fuente</a>` : ''}</span>`).join('') : '<span class="small">Sin novedades de EPS en las noticias.</span>'}
+          ${rev.errorIA ? '<span class="small muted">La búsqueda de noticias falló esta vez.</span>' : ''}` : '<span class="small muted">Se hace sola el día 1 de cada mes y te avisa al celular.</span>'}</div>
+      ${desc.length ? `<div class="card" style="gap:6px"><b>EPS que escribieron las familias y no tenemos</b>${desc.map(([k, v]) => `<div class="row"><span class="grow small">${esc(k)} · ${v.n} ${v.n === 1 ? 'vez' : 'veces'}</span><button class="btn sm" data-ep="agregar" data-nom="${esc(k)}">Agregar</button><button class="btn sm ghost" data-ep="ignorar" data-nom="${esc(k)}">Ignorar</button></div>`).join('')}</div>` : ''}
+      <div class="row"><b class="grow">${EPS.length} EPS en el directorio</b><button class="btn sm primary" data-ep="nueva">+ Agregar EPS</button></div>
+      ${editando === '' ? form({ n: prefill, tels: [] }) : ''}
+      ${EPS.map(e => editando === e.k ? form(e) : `<div class="card row" style="gap:8px"><span class="grow"><b>${esc(e.n)}</b><br><span class="small muted">${(Array.isArray(e.tels) ? e.tels.length : (e.tels.contributivo.length + e.tels.subsidiado.length))} líneas${e.wa ? ' · WhatsApp' : ''}${e.web ? ' · web' : ''}</span></span><span class="badge ${ESTADO[e.estado || 'activa'][1]}">${ESTADO[e.estado || 'activa'][0]}</span><button class="btn sm" data-ep="editar" data-k="${esc(e.k)}">Editar</button></div>`).join('')}`;
+  };
+  box.addEventListener('click', async ev => {
+    const b = ev.target.closest('[data-ep]'); if (!b) return; const a = b.dataset.ep;
+    if (a === 'editar') { editando = b.dataset.k; draw(); return; }
+    if (a === 'nueva' || a === 'agregar') { editando = ''; prefill = a === 'agregar' ? b.dataset.nom.replace(/\b\w/g, c => c.toUpperCase()).replace(/\bEps\b/g, 'EPS') : ''; draw(); box.querySelector('#ep-n').focus(); return; }
+    if (a === 'cancelar') { editando = null; draw(); return; }
+    b.disabled = true;
+    try {
+      if (a === 'revisar') { const k = await api({ accion: 'revisar' }); toast(k.mensaje); }
+      if (a === 'ignorar') { await api({ accion: 'ignorar', nombre: b.dataset.nom }); delete info.desconocidas[b.dataset.nom]; }
+      if (a === 'quitar') { if (!confirm('¿Quitar esta EPS del directorio?')) { b.disabled = false; return; } const k = await api({ accion: 'quitar', k: editando }); aplicarDirectorio({ version: k.version, lista: k.lista }); info.version = k.version; editando = null; toast('Quitada'); }
+      if (a === 'guardar') {
+        const v = id => (box.querySelector('#' + id) || {}).value || ''; const e0 = editando ? epsPorK(editando) : {};
+        const n = v('ep-n').trim(); if (!n) { toast('Escribe el nombre'); b.disabled = false; return; }
+        const ent = Object.assign(epsSerial(e0 || {}), { k: e0 && e0.k || normTxt(n).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30), n, alias: v('ep-alias'), web: v('ep-wu') ? [v('ep-wl') || 'Pedir cita en línea', v('ep-wu')] : null, wa: v('ep-wa').replace(/\D/g, ''), waName: v('ep-wan'), nota: v('ep-nota'), more: v('ep-more'), estado: v('ep-est'), destino: v('ep-dst'), avisoNota: v('ep-av'), avisoFecha: v('ep-est') !== 'activa' ? (e0 && e0.avisoFecha) || todayISO() : '' });
+        ent.tels = box.querySelector('#ep-tc') ? { contributivo: telsDe(v('ep-tc')), subsidiado: telsDe(v('ep-ts')) } : telsDe(v('ep-t'));
+        if (!e0 || !e0.patron) ent.patron = '';
+        const k = await api({ accion: 'guardar', entrada: ent, quitarDesconocida: prefill ? prefill.toLowerCase() : '' });
+        aplicarDirectorio({ version: k.version, lista: k.lista }); try { localStorage.setItem('fs-eps', JSON.stringify({ version: k.version, lista: k.lista })); } catch (_) {}
+        if (prefill) delete info.desconocidas[prefill.toLowerCase()];
+        info.version = k.version; info.actualizado = new Date().toISOString(); editando = null; prefill = ''; toast('Guardado. Ya lo ven todas las familias.');
+      }
+    } catch (err) { toast(err.message); }
+    b.disabled = false; draw();
+  });
+  (async () => {
+    try {
+      info = await api({ accion: 'info' });
+      if (!info.hayDirectorio) { const k = await api({ accion: 'inicial', lista: EPS.map(epsSerial) }); aplicarDirectorio({ version: k.version, lista: k.lista }); info.version = k.version; info.actualizado = new Date().toISOString(); }
+      draw();
+    } catch (e) { box.innerHTML = `<span class="muted">${esc(e.message || 'No se pudo cargar el directorio.')}</span>`; }
+  })();
+}
+
 function adminGestiones(r) {
   let G = [], abierto = null;
   const box = r.querySelector('#ad-tg');
-  r.querySelector('#ad-seg').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; r.querySelectorAll('#ad-seg [data-tab]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); r.querySelector('#ad-tc').style.display = b.dataset.tab === 'c' ? 'grid' : 'none'; box.style.display = b.dataset.tab === 'g' ? 'grid' : 'none'; });
+  r.querySelector('#ad-seg').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; r.querySelectorAll('#ad-seg [data-tab]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); r.querySelector('#ad-tc').style.display = b.dataset.tab === 'c' ? 'grid' : 'none'; box.style.display = b.dataset.tab === 'g' ? 'grid' : 'none'; r.querySelector('#ad-te').style.display = b.dataset.tab === 'e' ? 'grid' : 'none'; });
   const datos = g => `Trámite: ${GEST_SERV[servDe(g)].t}
 ${g.persona.nombre}\n${g.persona.tipoDoc} ${g.persona.doc}\nEPS: ${g.persona.eps}${g.persona.regimen ? ' (' + g.persona.regimen + ')' : ''}${g.persona.nac ? '\nNacimiento: ' + g.persona.nac : ''}\n${GEST_SERV[servDe(g)].que} ${g.que}\nCiudad/sede: ${g.ciudad || '—'}\nDisponibilidad: ${g.disponibilidad || '—'}\nContacto: ${g.telefono}${g.notas ? '\nNotas: ' + g.notas : ''}`;
   const card = g => { const [t, cls] = GEST_TXT[g.estado]; const tel = g.telefono.replace(/\D/g, ''); const wa = tel.length === 10 ? '57' + tel : tel;
@@ -1916,6 +2009,7 @@ function channelsHTML(m, que, pre) {
   const e = epsOf(m);
   if (!m) return '';
   if (!e) return `<div class="card"><b>${m.eps ? `Aún no tenemos los canales de ${esc(m.eps)}` : `${esc(first(m))} no tiene EPS registrada`}</b><span class="small muted">Llama a la línea que aparece en el carné o en la página de su EPS.${m.eps ? '' : ' Agrégala en Familia para ver sus canales aquí.'}</span><a class="btn sm" href="${ADRES_URL}" target="_blank" rel="noopener">Consultar EPS en ADRES</a></div>`;
+  if (e.estado && e.estado !== 'activa') { const dst = epsPorK(e.destino); return `<div class="card" style="gap:8px;border-color:var(--crit)"><b>${esc(e.n)} ${e.estado === 'liquidada' ? 'fue liquidada' : 'se retiró de varias zonas'}</b><span class="small">${esc(e.avisoNota || '')} ${dst ? `Sus afiliados pasan a <b>${esc(dst.n)}</b>.` : ''} Confirma en ADRES a qué EPS quedó ${esc(first(m))}.</span><span class="chips">${dst ? `<button class="btn sm primary" type="button" data-eps-mover="${esc(m.id)}">Cambiar a ${esc(dst.n)}</button>` : ''}<a class="btn sm" href="${ADRES_URL}" target="_blank" rel="noopener">Consultar en ADRES</a></span></div>`; }
   const msg = scriptFor(m, que, pre);
   const tels = Array.isArray(e.tels) ? e.tels : (e.tels[m.regimen] || [...e.tels.contributivo, ...e.tels.subsidiado.map(([a, b]) => [a + ' (subsidiado)', b])]);
   const link = (lbl, url, cls = '', id = '') => `<a class="btn ${cls}" ${id ? `id="${id}" data-wa="${e.wa}"` : ''} href="${esc(url)}" target="_blank" rel="noopener" data-ch="${esc(lbl)}">${lbl.toLowerCase().includes('app') ? ic('share') : ic('send')} ${esc(lbl)}</a>`;
@@ -1933,6 +2027,18 @@ function channelsHTML(m, que, pre) {
     ${!tels.length && !e.web && !e.wa ? '<span class="small muted">Aún no pudimos verificar sus líneas. Usa el número del carné o el de su página oficial.</span>' : ''}
     ${e.wa && !e.waCitas ? '<span class="small muted">El WhatsApp de esta EPS atiende varios trámites; si no asigna citas, te dice por dónde pedirla.</span>' : ''}
     ${e.more ? `<a class="btn ${!tels.length && !e.web && !e.wa ? 'primary' : 'ghost'} sm" href="${esc(e.more)}" target="_blank" rel="noopener">Ver canales oficiales de ${esc(e.n)}</a>` : ''}</div>`;
+}
+function moverEps(mid) { const m = member(mid), e = epsOf(m), dst = e && epsPorK(e.destino); if (!m || !dst) return; m.eps = dst.n; persist(); render(); toast(`${first(m)} quedó en ${dst.n}`); }
+function openEpsCambio(mid) {
+  const m = member(mid), e = epsOf(m); if (!m || !e) return; const dst = epsPorK(e.destino);
+  openDialog(`${head('Cambio de EPS')}
+    <p style="margin:0"><b>${esc(e.n)}</b> ${e.estado === 'liquidada' ? 'fue liquidada' : 'se retiró de varias zonas del país'}${e.avisoFecha ? ` (${fmtLong(e.avisoFecha)})` : ''}.</p>
+    ${e.avisoNota ? `<p class="small" style="margin:0">${esc(e.avisoNota)}</p>` : ''}
+    <p class="small" style="margin:0">${dst ? `Según la Superintendencia de Salud, sus afiliados pasan a <b>${esc(dst.n)}</b>. ` : ''}Antes de cambiarla, confirma en ADRES con el documento de ${esc(first(m))} a qué EPS quedó: no hay que hacer ningún trámite, el traslado es automático.</p>
+    <div class="dlg-foot"><a class="btn" href="${ADRES_URL}" target="_blank" rel="noopener">Consultar en ADRES</a>${dst ? `<button class="btn primary" id="ec-ok">Cambiar a ${esc(dst.n)}</button>` : '<button class="btn primary" id="ec-edit">Escribir la nueva EPS</button>'}</div>`, r => {
+    r.querySelector('#ec-ok')?.addEventListener('click', () => { moverEps(mid); dlg.close(); });
+    r.querySelector('#ec-edit')?.addEventListener('click', () => openMember(mid));
+  });
 }
 function pickCiudad(mid, done) {
   const m = member(mid); const cur = ciudadDe(m);
@@ -1965,6 +2071,7 @@ function openPedir(pre = {}) {
       r.querySelectorAll('[data-ch]').forEach(a => a.addEventListener('click', () => { lastCh = a.dataset.ch; }));
       r.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
       r.querySelectorAll('[data-ciudad]').forEach(b => b.onclick = () => pickCiudad(b.dataset.ciudad, () => draw()));
+      r.querySelectorAll('[data-eps-mover]').forEach(b => b.onclick = () => { moverEps(b.dataset.epsMover); draw(); });
       r.querySelector('#pd-copy').onclick = () => copyText(r.querySelector('#pd-script').textContent);
       r.querySelector('#pd-gest')?.addEventListener('click', () => openGestion({ miembroId: mid, que: val(r, 'pd-que'), servicio: 'cita' }));
       r.querySelector('#pd-part').onclick = () => openParticular({ miembroId: mid, especialidad: val(r, 'pd-que') });
