@@ -37,7 +37,7 @@ export default async (req: Request) => {
       if (estado === "radicado") {
         const numero = txt(body.radicado?.numero, 60);
         if (!numero) return json({ error: "Escribe el número de radicado que dio la EPS." }, 400);
-        const p = plazoRespuesta(g.persona.nac);
+        const p = plazoRespuesta(g.persona.nac, new Date(), g.servicio || "radicar");
         g.radicado = { numero, fecha: new Date().toISOString(), limite: p.limite, mayor: p.mayor };
       }
       if (estado === "lista") {
@@ -61,7 +61,8 @@ export default async (req: Request) => {
       const nombre = g.persona.nombre.split(" ")[0];
       const esCita = (g.servicio || "cita") === "cita";
       const aut = g.resultado?.autorizacion;
-      const msg = estado === "radicado" ? { title: `Orden radicada · ${nombre}`, body: `Radicado N.° ${g.radicado!.numero}. La EPS debe responder a más tardar el ${fechaCO(g.radicado!.limite)}. Te avisamos.` }
+      const quien = g.servicio === "historia" ? "La institución" : "La EPS";
+      const msg = estado === "radicado" ? { title: `${g.servicio === "historia" ? "Solicitud de historia clínica radicada" : g.servicio === "traslado" ? "Transporte solicitado" : "Orden radicada"} · ${nombre}`, body: `Radicado N.° ${g.radicado!.numero}. ${quien} debe responder a más tardar el ${fechaCO(g.radicado!.limite)}. Te avisamos.` }
         : estado === "lista" && aut ? { title: `¡Autorización aprobada para ${nombre}!`, body: `${aut.servicio}${aut.prestador ? " en " + aut.prestador : ""}${aut.vence ? ". Vence el " + aut.vence : ""}. Ábrela para guardarla.`.slice(0, 200) }
         : estado === "lista" ? (esCita ? { title: `¡Cita lista para ${nombre}!`, body: `${g.que}: ${g.resultado!.fecha}${g.resultado!.hora ? " a las " + g.resultado!.hora : ""}. Ábrela para agregarla a tu agenda.` }
           : { title: `Trámite listo para ${nombre}`, body: `${SERVICIOS[g.servicio]}: ${g.resultado!.notas || "listo"}`.slice(0, 180) })
@@ -96,10 +97,15 @@ export default async (req: Request) => {
       id: nuevoId(), famId: fam.id, userId: user.id, email: user.email || "", creada: new Date().toISOString(), actualizada: new Date().toISOString(), estado: "pago", precio: PRECIOS.gestion, servicio,
       persona: { id: txt(p.id, 40), nombre: txt(p.nombre, 100), tipoDoc: txt(p.tipoDoc, 10), doc: txt(p.doc, 20), eps: txt(p.eps, 80), regimen: txt(p.regimen, 20), nac: txt(p.nac, 10) },
       que: txt(body.que, 120), ciudad: txt(body.ciudad, 80), disponibilidad: txt(body.disponibilidad, 200), telefono: txt(body.telefono, 20), notas: txt(body.notas, 500), tieneFoto: false,
+      correoEntrega: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(body.correoEntrega || "")) ? txt(body.correoEntrega, 120) : "",
+      relacion: ["propia", "familiar", "fallecido"].includes(body.relacion) ? body.relacion : "",
+      viaje: body.viaje && typeof body.viaje === "object" ? Object.fromEntries(Object.entries(body.viaje).slice(0, 12).map(([k, v]) => [txt(k, 20), typeof v === "boolean" ? v : txt(v, 160)])) : null,
       lectura: body.lectura && typeof body.lectura === "object" ? Object.fromEntries(Object.entries(body.lectura).slice(0, 14).map(([k, v]) => [txt(k, 20), typeof v === "boolean" || v === null ? v : txt(v, 200)])) : null,
     };
     if (!g.persona.nombre || !g.que) return json({ error: "Dinos para quién es y qué necesitas." }, 400);
     if (servicio === "radicar" && !(body.foto && typeof body.foto.data === "string")) return json({ error: "Para radicar necesitamos la foto de la orden médica." }, 400);
+    if (servicio === "historia" && body.relacion !== "propia" && !(body.foto && typeof body.foto.data === "string")) return json({ error: "Sube la foto de la autorización firmada (o de los documentos, si la persona falleció)." }, 400);
+    if (servicio === "traslado" && !(body.foto && typeof body.foto.data === "string")) return json({ error: "Sube la foto de la autorización de la EPS donde aparece la IPS de la otra ciudad." }, 400);
     if (!g.persona.doc || !g.persona.eps) return json({ error: "Para pedir la cita necesitamos el documento y la EPS de la persona. Agrégalos en Familia." }, 400);
     if (!/^\+?\d[\d ]{6,18}$/.test(g.telefono)) return json({ error: "Escribe un celular de contacto válido." }, 400);
     if (body.autoriza !== true) return json({ error: "Necesitamos tu autorización para gestionar la cita con la EPS." }, 400);

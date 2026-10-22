@@ -18,7 +18,7 @@ export default async () => {
       g.radicado.vencidoAviso = true; await gs.setJSON(key, g); vencidos++;
       const fam = (await resolveFamily({ id: g.userId, email: g.email })).fam;
       const ids = fam ? fam.miembros.map(m => m.userId) : [g.userId];
-      await avisar(ids, { title: "La EPS no respondió a tiempo", body: `Se venció el plazo del radicado N.° ${g.radicado.numero} (${g.que}). Abre la app: la queja ya está lista para enviar.`, tag: "gestion-" + g.id, url: "/" });
+      await avisar(ids, { title: g.servicio === "historia" ? "La institución no respondió a tiempo" : "La EPS no respondió a tiempo", body: `Se venció el plazo del radicado N.° ${g.radicado.numero} (${g.que}). Abre la app: el reclamo ya está listo para enviar.`, tag: "gestion-" + g.id, url: "/" });
       await avisar(admins, { title: "Radicado vencido", body: `${g.persona.nombre} · ${g.que} · N.° ${g.radicado.numero}. Insiste con la EPS o pon la queja.`, tag: "admin-venc-" + g.id, url: "/" });
     }
     const quieto = now - Date.parse(g.actualizada || g.creada);
