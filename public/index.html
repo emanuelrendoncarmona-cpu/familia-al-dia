@@ -328,8 +328,8 @@ const EPS_VERIFIED = 'oct 2026';
 const EPS = [
   { k: 'nueva', n: 'Nueva EPS', match: /nueva\s*eps/i, web: ['Pedir cita en línea', 'https://solucionjb.nuevaeps.com.co/NEPS_Citasweb-1.0-SNAPSHOT/login.xhtml'], app: ['App Afiliados', 'https://app.nuevaeps.com.co/#/'], wa: '573214459657', waName: 'EVA', tels: { contributivo: [['Nacional', '018000954400'], ['Bogotá', '6013077022']], subsidiado: [['Nacional', '018000952000'], ['Bogotá', '6013077051']] }, more: 'https://www.nuevaeps.com.co/personas/canales-no-presenciales-ecosistema-de-servicios' },
   { k: 'sanitas', n: 'EPS Sanitas', match: /sanitas/i, web: ['Citas médicas en línea', 'https://www.epssanitas.com/usuarios/web/nuevo-portal-eps/citas-medicas'], app: ['App EPS Sanitas (Android)', 'https://play.google.com/store/apps/details?id=colsanitas.foonkiemonkey.com.co.eps'], app2: ['App EPS Sanitas (iPhone)', 'https://itunes.apple.com/co/app/eps-sanitas/id960869433?mt=8'], wa: '573202550525', waName: 'Ana María', tels: [['Bogotá', '6013759000'], ['Medellín', '6045908383'], ['Cali', '6023989340'], ['Barranquilla', '6053226888'], ['Nacional (fijo)', '018000919100'], ['Desde celular', '#936']] },
-  { k: 'sura', n: 'EPS Sura', match: /sura/i, web: ['Pedir cita (con tu clave)', 'https://www.epssura.com/afiliados'], extra: ['Sacar la clave de afiliado', 'https://solicitudes.sura.com/SS/Register/Eps/UsersRegistration.aspx?&cdMod=EMP'], tels: [['Medellín', '6044486115'], ['Bogotá', '6014897941'], ['Resto del país', '018000519519']] },
-  { k: 'saludtotal', n: 'Salud Total EPS-S', match: /salud\s*total/i, web: ['Pide tus citas', 'https://saludtotal.com.co/pide-tus-citas-medicas/'], app: ['App Salud Total (Android)', 'https://play.google.com/store/apps/details?id=com.saludtotal.saludtotaleps&hl=es_CO'], app2: ['App Salud Total (iPhone)', 'https://apps.apple.com/co/app/salud-total-eps-s/id972508544'], wa: '573107737993', waName: 'Pablo', waCitas: true, tels: [['Nacional', '018000114524']] },
+  { k: 'sura', n: 'EPS Sura', match: /sura/i, web: ['Pedir cita (con tu clave)', 'https://www.epssura.com/afiliados'], extra: ['Sacar la clave de afiliado', 'https://solicitudes.sura.com/SS/Register/Eps/UsersRegistration.aspx?&cdMod=EMP'], tels: [['Armenia (Quindío)', '6067314936'], ['Pereira (Risaralda)', '6063251999'], ['Manizales (Caldas)', '6068859515'], ['Medellín (Antioquia)', '6044486115'], ['Bogotá', '6014897941'], ['Cali', '6023808941'], ['Barranquilla', '6053197901'], ['Cartagena', '6056424946'], ['Bucaramanga', '6076917941'], ['Apartadó', '6048288233'], ['Resto del país', '018000519519']] },
+  { k: 'saludtotal', n: 'Salud Total EPS-S', match: /salud\s*total/i, web: ['Pide tus citas', 'https://saludtotal.com.co/pide-tus-citas-medicas/'], app: ['App Salud Total (Android)', 'https://play.google.com/store/apps/details?id=com.saludtotal.saludtotaleps&hl=es_CO'], app2: ['App Salud Total (iPhone)', 'https://apps.apple.com/co/app/salud-total-eps-s/id972508544'], wa: '573107737993', waName: 'Pablo', waCitas: true, tels: [['Armenia y Quindío (citas)', '6067314942'], ['Pereira y Risaralda (citas)', '6063497300'], ['Manizales y Caldas (citas)', '6068782300'], ['Medellín y Antioquia (citas)', '6043199999'], ['Bogotá (citas)', '6014854555'], ['Cundinamarca (citas)', '6018872828'], ['Cali y Valle (citas)', '6023981004'], ['Barranquilla y Atlántico (citas)', '6053698585'], ['Cartagena y Bolívar (citas)', '6056569340'], ['Tunja y Boyacá (citas)', '6087405988'], ['Valledupar y Cesar (citas)', '6055748250'], ['Montería y Córdoba (citas)', '6047848949'], ['Neiva y Huila (citas)', '6088664898'], ['Riohacha y La Guajira (citas)', '6057279872'], ['Santa Marta y Magdalena (citas)', '6054328777'], ['Villavicencio y Meta (citas)', '6086818229'], ['Cúcuta y Norte de Santander (citas)', '6075748791'], ['Bucaramanga y Santander (citas)', '6076438150'], ['Sincelejo y Sucre (citas)', '6052799222'], ['Ibagué y Tolima (citas)', '6082709777'], ['Nacional (citas)', '018000114524']] },
   { k: 'famisanar', n: 'Famisanar', match: /famisanar/i, web: ['Agendamiento de citas', 'https://www.famisanar.com.co/afiliados/pbs/agendamiento-citas'], wa: '573006438831', tels: [['Bogotá', '6013078069'], ['Nacional', '018000116662']] },
   { k: 'compensar', n: 'Compensar EPS', match: /compensar/i, app: ['App Compensar Salud (iPhone)', 'https://apps.apple.com/co/app/compensar-salud/id1128503411'], tels: [] },
   { k: 'coosalud', n: 'Coosalud', match: /coosalud/i, web: ['Cita de medicina general', 'https://provida.citascoosalud.site/'], tels: [['Nacional', '018000515611'], ['Desde celular', '#922']] },
@@ -351,7 +351,7 @@ const EPS = [
   { k: 'mallamas', n: 'Mallamas EPSI', match: /mallamas/i, tels: [], more: 'http://www.mallamaseps.com.co/' },
   // Regímenes especiales y de excepción: las citas se piden en el establecimiento o prestador asignado.
   { k: 'militar', n: 'Sanidad Militar (Fuerzas Militares)', especial: true, match: /sanidad\s*militar|fuerzas\s*militares|\bdgsm\b|ej[eé]rcito|armada|fuerza\s*a[eé]rea|\bfac\b/i, tels: [['Call center de citas (Bogotá)', '6017944222'], ['Jefatura Salud FAC', '6013487030']], nota: 'Citas de medicina y odontología, generales y especializadas. Para confirmar o cancelar hay respuesta automática las 24 horas. En otras ciudades, pide la cita en tu establecimiento de sanidad militar.', more: 'https://www.sanidadfuerzasmilitares.mil.co/?idcategoria=429' },
-  { k: 'policia', n: 'Sanidad Policía Nacional', especial: true, match: /polic[ií]a|\bdisan\b|sanidad\s*polic/i, tels: [['Bogotá (citas)', '6013788990'], ['Medellín (citas)', '6042961000'], ['Cali (citas)', '6025240930'], ['Barranquilla (citas)', '6053930070'], ['Bucaramanga (citas)', '6077008640'], ['Pereira (citas)', '6063401575'], ['Armenia (citas)', '6067368926'], ['Manizales (citas)', '3232540189']], nota: 'Cada departamento tiene su línea de asignación y cancelación de citas. Si tu ciudad no está aquí, búscala en el directorio oficial.', more: 'https://www.policia.gov.co/sites/default/files/descargables/DIRECTORIO%20citas%20medicas%20nivel%20nacional.pdf' },
+  { k: 'policia', n: 'Sanidad Policía Nacional', especial: true, match: /polic[ií]a|\bdisan\b|sanidad\s*polic/i, tels: [['Bogotá (citas)', '6013788990'], ['Medellín (citas)', '6042961000'], ['Cali (citas)', '6025240930'], ['Barranquilla (citas)', '6053930070'], ['Bucaramanga (citas)', '6077008640'], ['Pereira y Risaralda (citas)', '6063401575'], ['Armenia y Quindío (citas)', '6067368926'], ['Manizales y Caldas (citas)', '3232540189']], nota: 'Cada departamento tiene su línea de asignación y cancelación de citas. Si tu ciudad no está aquí, búscala en el directorio oficial.', more: 'https://www.policia.gov.co/sites/default/files/descargables/DIRECTORIO%20citas%20medicas%20nivel%20nacional.pdf' },
   { k: 'fomag', n: 'FOMAG (Magisterio)', especial: true, match: /fomag|magisterio|docente/i, tels: [['Línea de salud (Bogotá)', '6019169223'], ['Línea de salud (nacional)', '018000160500']], nota: 'Las citas se piden con el prestador de salud asignado en tu región. La línea de salud te dice cuál es y te orienta.', more: 'https://www.fomag.gov.co/preguntas_frecuentes/canales-de-atencion/' },
 ];
 const ADRES_URL = 'https://aplicaciones.adres.gov.co/BDUA_Internet/Pages/ConsultarAfiliadoWeb_2.aspx';
@@ -1889,17 +1889,27 @@ function scriptFor(m, que, pre) {
 }
 // Líneas según la ciudad: primero las de su ciudad, luego las nacionales; las de otras ciudades quedan en "Ver todas".
 const normTxt = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-const CIUDADES = ['Bogotá', 'Medellín', 'Cali', 'Barranquilla', 'Cartagena', 'Bucaramanga', 'Cúcuta', 'Pereira', 'Armenia', 'Manizales', 'Ibagué', 'Villavicencio', 'Santa Marta', 'Pasto', 'Neiva', 'Montería', 'Valledupar', 'Popayán', 'Tunja', 'Sincelejo', 'Riohacha', 'Yopal', 'Quibdó', 'Florencia', 'Puerto Gaitán', 'Envigado', 'Soacha'];
+const CIUDADES = ['Apartadó', 'Bogotá', 'Medellín', 'Cali', 'Barranquilla', 'Cartagena', 'Bucaramanga', 'Cúcuta', 'Pereira', 'Armenia', 'Manizales', 'Ibagué', 'Villavicencio', 'Santa Marta', 'Pasto', 'Neiva', 'Montería', 'Valledupar', 'Popayán', 'Tunja', 'Sincelejo', 'Riohacha', 'Yopal', 'Quibdó', 'Florencia', 'Puerto Gaitán', 'Envigado', 'Soacha'];
 const DEPTO_CAPITAL = { quindio: 'Armenia', risaralda: 'Pereira', caldas: 'Manizales', antioquia: 'Medellín', valle: 'Cali', 'valle del cauca': 'Cali', atlantico: 'Barranquilla', bolivar: 'Cartagena', santander: 'Bucaramanga', 'norte de santander': 'Cúcuta', tolima: 'Ibagué', meta: 'Villavicencio', magdalena: 'Santa Marta', narino: 'Pasto', huila: 'Neiva', cordoba: 'Montería', cesar: 'Valledupar', cauca: 'Popayán', boyaca: 'Tunja', sucre: 'Sincelejo', 'la guajira': 'Riohacha', casanare: 'Yopal', choco: 'Quibdó', caqueta: 'Florencia', cundinamarca: 'Bogotá' };
 const ciudadDe = m => (m && m.ciudad) || (S.familia && S.familia.ciudad) || '';
-function ciudadBase(c) { const t = normTxt(c).split(',')[0].replace(/\b(sede|norte|sur|centro)\b.*$/, '').trim(); return DEPTO_CAPITAL[t] ? normTxt(DEPTO_CAPITAL[t]) : t; }
-function telsPorCiudad(tels, ciudad) {
-  const base = ciudadBase(ciudad), out = { local: [], general: [], otras: [] };
-  tels.forEach(t => {
-    const c = CIUDADES.find(x => normTxt(t[0]).includes(normTxt(x)));
-    if (!c) out.general.push(t); else if (base && (normTxt(c) === base || base.includes(normTxt(c)))) out.local.push(t); else out.otras.push(t);
+// Claves de la ubicación escrita: "Calarcá, Quindío" → ['calarca', 'quindio', 'armenia'].
+function ciudadClaves(c) {
+  const out = new Set();
+  normTxt(c).split(/[,()\-\/]/).map(t => t.replace(/\b(sede|norte|sur|centro|d\.?c\.?)\b.*$/, '').trim()).filter(Boolean).forEach(t => {
+    out.add(t); const dep = Object.keys(DEPTO_CAPITAL).find(d => t === d || t === d.replace('valle del cauca', 'valle')); if (dep) out.add(normTxt(DEPTO_CAPITAL[dep]));
   });
-  if (!base) { out.general = tels.slice(); out.otras = []; }
+  return [...out];
+}
+const lugarEnEtiqueta = l => { const t = normTxt(l); return CIUDADES.some(x => t.includes(normTxt(x))) || Object.keys(DEPTO_CAPITAL).some(d => t.includes(d)); };
+function telsPorCiudad(tels, ciudad) {
+  const claves = ciudadClaves(ciudad), out = { local: [], general: [], otras: [] };
+  if (!claves.length) { out.general = tels.slice(); return out; }
+  tels.forEach(t => {
+    const l = normTxt(t[0]);
+    if (!lugarEnEtiqueta(t[0])) out.general.push(t);
+    else if (claves.some(k => k.length > 2 && l.includes(k))) out.local.push(t);
+    else out.otras.push(t);
+  });
   return out;
 }
 function channelsHTML(m, que, pre) {
@@ -1914,7 +1924,7 @@ function channelsHTML(m, que, pre) {
     ${(() => {
       if (!tels.length) return '';
       const ciudad = ciudadDe(m), g = telsPorCiudad(tels, ciudad);
-      const row = ([lbl, n], local) => `<div class="row telrow"${local ? ' style="box-shadow:0 0 0 1.5px var(--accent) inset"' : ''}><span class="num"><span class="small muted">${esc(lbl)}${local ? ' · <b style="color:var(--accent-text)">tu ciudad</b>' : ''}</span><br><span class="mono">${esc(fmtTel(n))}</span></span><span class="chips"><a class="btn sm" href="tel:${encodeURIComponent(n)}" data-ch="Teléfono">Llamar</a><button class="btn sm" data-copy="${esc(n)}">Copiar</button></span></div>`;
+      const row = ([lbl, n], local) => `<div class="row telrow"${local ? ' style="box-shadow:0 0 0 1.5px var(--accent) inset"' : ''}><span class="num"><span class="small muted">${esc(lbl)}${local ? ' · <b style="color:var(--accent-text)">tu zona</b>' : ''}</span><br><span class="mono">${esc(fmtTel(n))}</span></span><span class="chips"><a class="btn sm" href="tel:${encodeURIComponent(n)}" data-ch="Teléfono">Llamar</a><button class="btn sm" data-copy="${esc(n)}">Copiar</button></span></div>`;
       const city = `<div class="row" style="gap:6px"><span class="small muted grow">${ciudad ? `Líneas para <b>${esc(ciudad)}</b>` : '¿En qué ciudad se atiende? Así te mostramos su línea.'}</span><button class="btn sm ghost" type="button" data-ciudad="${esc(m.id)}">${ciudad ? 'Cambiar ciudad' : 'Elegir ciudad'}</button></div>`;
       const sinLocal = ciudad && !g.local.length && g.otras.length ? `<span class="small muted">${esc(e.n)} no publica una línea propia para ${esc(ciudad)}. Usa la línea nacional${e.wa ? ' o el WhatsApp' : ''}.</span>` : '';
       return `${city}<div class="checklist">${g.local.map(t => row(t, true)).join('')}${g.general.map(t => row(t)).join('')}</div>${sinLocal}${g.otras.length ? `<details><summary class="small" style="cursor:pointer;font-weight:600">Ver todas las líneas (${tels.length})</summary><div class="checklist" style="margin-top:8px">${g.otras.map(t => row(t)).join('')}</div></details>` : ''}`;
