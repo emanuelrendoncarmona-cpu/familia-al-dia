@@ -31,6 +31,9 @@ export async function indexarAgenda(famId: string, agenda: any) {
   for (const d of prev) if (!nuevos.has(d)) await s.delete(`dia/${d}/${famId}`);
   for (const d of nuevos) if (!prev.includes(d)) await s.set(`dia/${d}/${famId}`, "1");
   await s.setJSON(`fam/${famId}`, { dias: [...nuevos].slice(0, 400) });
+  // Familias con medicamentos que tienen horas de toma: el recordatorio las revisa cada 10 minutos.
+  const conHoras = !agenda?.ejemplo && (Array.isArray(agenda?.meds) ? agenda.meds : []).some((m: any) => Array.isArray(m?.horas) && m.horas.length && m.aviso !== false);
+  if (conHoras) await s.set(`meds/${famId}`, "1"); else await s.delete(`meds/${famId}`);
 }
 
 // Precios en pesos (los muestra la app; el plan se activa a mano desde el panel al ver el pago).
@@ -39,6 +42,15 @@ export const PRECIOS = { mensual: 14900, anual: 149000, gestion: 19900 };
 // Uso justo del asistente con IA por familia y por mes (cada consulta gasta créditos de Netlify).
 export const USO_MES = { asistente: 150, busqueda: 15 };
 const mesActual = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 7); // mes en hora de Colombia
+export async function usoTotalMes() { return ((await stores.uso().get(`total/${mesActual()}`, { type: "json" })) as { asistente?: number; busqueda?: number } | null) || {}; }
+// Registro de ingresos por mes (para el resumen del panel). valor negativo = devolución o corrección.
+export async function registrarIngreso(concepto: string, valor: number, email: string) {
+  const k = `ingresos/${mesActual()}`; const a = stores.ajustes();
+  const r = ((await a.get(k, { type: "json" })) as { total: number; items: any[] } | null) || { total: 0, items: [] };
+  r.total += valor; r.items.push({ fecha: new Date().toISOString(), concepto, valor, email }); r.items = r.items.slice(-500);
+  await a.setJSON(k, r);
+}
+export async function ingresosMes() { return ((await stores.ajustes().get(`ingresos/${mesActual()}`, { type: "json" })) as { total: number; items: any[] } | null) || { total: 0, items: [] }; }
 export async function usoMes(famId: string) {
   const u = (await stores.uso().get(`mes/${famId}/${mesActual()}`, { type: "json" })) as { asistente?: number; busqueda?: number } | null;
   return { asistente: u?.asistente || 0, busqueda: u?.busqueda || 0 };
@@ -50,6 +62,7 @@ export async function gastarUso(famId: string, tipo: "asistente" | "busqueda") {
   if (n >= USO_MES[tipo]) return false;
   u[tipo] = n + 1;
   await stores.uso().setJSON(key, u);
+  try { const tk = `total/${mesActual()}`; const t = ((await stores.uso().get(tk, { type: "json" })) as any) || {}; t[tipo] = (t[tipo] || 0) + 1; await stores.uso().setJSON(tk, t); } catch {}
   return true;
 }
 

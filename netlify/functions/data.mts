@@ -1,6 +1,7 @@
 // /api/data — agenda compartida de la familia del usuario (con control de versiones para no pisar cambios).
 import type { Config } from "@netlify/functions";
 import { requireUser, getCuenta, estadoCuenta, stores, json, resolveFamily, familiaPublica, usoMes, USO_MES, PRECIOS, indexarAgenda, type Cuenta } from "../../lib/common.mts";
+import { correos, correoActivo } from "../../lib/correo.mts";
 
 const MAX_BYTES = 900_000;
 
@@ -20,6 +21,7 @@ export default async (req: Request) => {
   const base = { cuenta: { email: user.email, dueno: owner.email, ...estado, ...extra, calUrl: `${origin}/api/cal/${cuenta.calToken}` }, rol, familia: familiaPublica(fam, user.id), invitacion: invite ? { familia: invite.familia, por: invite.por, rol: invite.rol } : null, admin: Array.isArray(user.roles) && user.roles.includes("admin") };
 
   if (req.method === "GET") {
+    if (esDueno && correoActivo() && !(cuenta as any).bienvenida && Date.now() - Date.parse(cuenta.creada) < 2 * 864e5) { (cuenta as any).bienvenida = new Date().toISOString(); await stores.cuentas().setJSON(cuenta.userId, cuenta); await correos.bienvenida(cuenta.email); }
     const agenda: any = await stores.agendas().get(fam.id, { type: "json" });
     return json({ agenda: agenda || null, ...base });
   }

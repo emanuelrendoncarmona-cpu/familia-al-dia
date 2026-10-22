@@ -189,6 +189,13 @@ nav.dock .dotn{position:absolute;top:6px;right:calc(50% - 18px);width:8px;height
 .empty{background:var(--glass);border:1px dashed var(--line);border-radius:var(--r);padding:26px 18px;text-align:center;display:grid;gap:10px;justify-items:center}
 .onboard{background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:28px;padding:26px;display:grid;gap:16px;margin-top:16px;box-shadow:var(--shadow)}
 .onboard h2{font-size:1.75rem}
+.mic{border:0;background:none;color:var(--accent-text);padding:6px;border-radius:999px;cursor:pointer;display:inline-flex}
+.mic .i{width:22px;height:22px}.mic.on{background:var(--crit);color:#fff;animation:pulso 1s infinite}
+@keyframes pulso{50%{opacity:.6}}@media (prefers-reduced-motion:reduce){.mic.on{animation:none}}
+.fmic{display:flex;gap:4px;align-items:center}.fmic>input,.fmic>textarea{flex:1;min-width:0}
+html.sencillo{--scale:1.25}html.sencillo .sbtn{grid-template-columns:auto 1fr;column-gap:14px;align-items:center;text-align:left;min-height:84px}
+html.sencillo .sbtn b{font-size:1.2em}html.sencillo .sbtn.hot{border-color:var(--accent);box-shadow:0 0 0 1.5px var(--accent) inset}
+html.sencillo #dock{display:none!important}
 .qa{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
 .qa button{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--glass);border-radius:18px;padding:14px;color:var(--text);font:inherit;cursor:pointer;min-height:72px}
 .qa button b{font-family:var(--display);font-size:1rem;line-height:1.2}
@@ -308,6 +315,7 @@ const I = {
   share: '<path d="M4 12v7h16v-7M12 3v12M7.5 7.5L12 3l4.5 4.5"/>',
   google: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18M12 13v5M9.5 15.5h5"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
 };
 const ic = (k, cls = 'i') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[k]}</svg>`;
 
@@ -477,7 +485,7 @@ const stripMeta = o => { const c = Object.assign({}, o); delete c.version; delet
 
 // ---------- text size (per viewer convenience) ----------
 let big = false; try { big = localStorage.getItem(LS_SIZE) === '1'; } catch (_) {}
-const applySize = () => { document.documentElement.style.setProperty('--scale', big ? '1.15' : '1'); $('#textSize').setAttribute('aria-pressed', big); };
+const applySize = () => { document.documentElement.style.setProperty('--scale', document.documentElement.classList.contains('sencillo') ? (big ? '1.35' : '1.25') : big ? '1.15' : '1'); $('#textSize').setAttribute('aria-pressed', big); };
 $('#helpBtn').onclick = () => { if (S && S.consent) go('ayuda'); };
 $('#textSize').onclick = () => { big = !big; try { localStorage.setItem(LS_SIZE, big ? '1' : '0'); } catch (_) {} applySize(); };
 applySize();
@@ -761,8 +769,11 @@ const waUrl = c => 'https://wa.me/?text=' + encodeURIComponent(waText(c));
 
 // ---------- navigation ----------
 function go(v, sub) { view = v; if (sub) salud = sub; dayFilter = null; render(); window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' }); }
+let sencillo = (() => { try { return localStorage.getItem('fs-sencillo') === '1'; } catch (_) { return false; } })();
+function setSencillo(on) { sencillo = on; try { localStorage.setItem('fs-sencillo', on ? '1' : '0'); } catch (_) {} document.documentElement.classList.toggle('sencillo', on); applySize(); view = 'inicio'; render(); window.scrollTo(0, 0); toast(on ? 'Modo sencillo activado' : 'Modo completo'); }
+document.documentElement.classList.toggle('sencillo', sencillo);
 function renderDock() {
-  const d = $('#dock'); if (!S.consent) { d.hidden = true; return; } d.hidden = false;
+  const d = $('#dock'); if (!S.consent || sencillo) { d.hidden = true; return; } d.hidden = false;
   const saludN = S.auts.filter(a => a.estado !== 'usada' && (daysUntil(a.vence) ?? 99) <= 15).length + S.controles.filter(k => k.estado === 'pendiente' && (daysUntil(k.fecha) ?? 99) <= 21).length + S.meds.filter(m => (daysUntil(m.proxima) ?? 99) <= 5).length;
   const b = (k, label, i, dot) => `<button data-go="${k}" ${view === k ? 'aria-current="page"' : ''}>${ic(i)}<span>${label}</span>${dot ? '<span class="dotn" aria-label="Hay avisos"></span>' : ''}</button>`;
   d.innerHTML = b('inicio', 'Inicio', 'home') + b('agenda', 'Agenda', 'cal') + `<button class="plus" id="dockPlus" aria-label="Nueva cita">${ic('plus')}</button>` + b('salud', 'Salud', 'pulse', saludN > 0) + b('familia', 'Familia', 'people');
@@ -779,23 +790,74 @@ function render() {
   const demo = S.ejemplo && rol === 'admin' ? `<div class="notice"><span>Estás viendo una familia de ejemplo.</span><button class="btn sm" data-act="clear-demo">Empezar con la mía</button></div>` : '';
   const borra = mode === 'netlify' && acct && acct.borraEl && !acct.activo ? `<div class="notice" style="background:var(--crit-soft)"><span><b>Tu información se borrará el ${esc(fmtLong(String(acct.borraEl).slice(0, 10)))}.</b> Tu plan lleva más de un año vencido. Renuévalo antes de esa fecha para conservarla, o descarga una copia.</span><span class="chips"><button class="btn sm primary" data-act="plan">Renovar</button><button class="btn sm" data-act="backup">Descargar copia</button></span></div>` : '';
   const pay = mode === 'netlify' && acct && !acct.activo ? `<div class="notice" style="background:var(--crit-soft)"><span><b>Tu prueba gratis terminó.</b> Puedes ver y exportar tus datos, pero los cambios no se guardan hasta activar tu plan.</span><button class="btn sm primary" data-act="plan">Activar plan</button></div>`
+    : mode === 'netlify' && acct && acct.plan === 'pago' && acct.dias <= 5 ? `<div class="notice"><span>Tu plan vence ${acct.dias === 0 ? 'hoy' : `en ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}`} (${esc(fmtLong(String(acct.hasta).slice(0, 10)))}). Renuévalo para no perder los recordatorios.</span><button class="btn sm primary" data-act="plan">Renovar</button></div>`
     : mode === 'netlify' && acct && acct.plan === 'prueba' && acct.dias <= 3 ? `<div class="notice"><span>Te quedan ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'} de prueba gratis.</span><button class="btn sm" data-act="plan">Ver planes</button></div>` : '';
   const roBanner = mode === 'netlify' && rol === 'lector' ? `<div class="notice"><span>Tienes acceso <b>solo para ver</b> la agenda de esta familia.</span></div>` : '';
   const invBanner = mode === 'netlify' && invitacion ? `<div class="notice" style="background:var(--ai-soft)"><span><b>${esc(invitacion.por)}</b> te invitó a la familia ${esc(invitacion.familia || '')}.</span><span class="chips"><button class="btn sm" data-act="inv-no">No, gracias</button><button class="btn sm primary" data-act="inv-si">Unirme</button></span></div>` : '';
-  const body = view === 'inicio' ? inicioHTML() : view === 'agenda' ? agendaHTML() : view === 'salud' ? saludHTML() : view === 'ayuda' ? ayudaHTML() : familiaHTML();
+  const body = sencillo ? sencilloHTML() : view === 'inicio' ? inicioHTML() : view === 'agenda' ? agendaHTML() : view === 'salud' ? saludHTML() : view === 'ayuda' ? ayudaHTML() : familiaHTML();
   app.innerHTML = demo + borra + pay + roBanner + invBanner + body;
   bind(app);
 }
 
 function askHTML() {
   const sugg = ['¿Qué tenemos esta semana?', `Cita de ${S.miembros[S.miembros.length - 1] ? first(S.miembros[S.miembros.length - 1]) : 'mi mamá'} el jueves a las 3 pm con cardiología`, '¿Qué autorizaciones se vencen pronto?', 'Control de pediatría en 3 meses'];
-  return `<div class="ask" id="askWrap"><form id="askForm" autocomplete="off"><span class="spark">${ic('spark')}</span><label class="sr" for="askIn">Escribe lo que necesitas</label><input id="askIn" placeholder="Escribe o dicta: “cita de mi papá mañana 7 am…”" enterkeyhint="send"><button type="submit" aria-label="Enviar">${ic('send')}</button></form></div>
+  return `<div class="ask" id="askWrap"><form id="askForm" autocomplete="off"><span class="spark">${ic('spark')}</span><label class="sr" for="askIn">Escribe lo que necesitas</label><input id="askIn" placeholder="Escribe o dicta: “cita de mi papá mañana 7 am…”" enterkeyhint="send">${micHTML('askIn')}<button type="submit" aria-label="Enviar">${ic('send')}</button></form></div>
   <div class="suggest">${sugg.map(s => `<button data-sugg="${esc(s)}">${esc(s)}</button>`).join('')}</div>
   ${answer ? `<div class="answer"><div class="row"><b>${ic('spark')} Asistente</b><button class="btn ghost sm" data-act="close-answer">Cerrar</button></div><p>${md(answer)}</p></div>` : ''}`;
 }
 
+// ---------- modo sencillo (letra grande, pocos botones) ----------
+function sencilloHTML() {
+  const up = upcoming().slice(0, 3);
+  const hoyMeds = S.meds.filter(md => Array.isArray(md.horas) && md.horas.length);
+  const big = (act, icon, t, sub, cls = '') => `<button class="card sbtn ${cls}" data-act="${act}"><span class="opt-ic">${ic(icon)}</span><span><b>${t}</b><br><span class="muted">${sub}</span></span></button>`;
+  return `<div class="sec" style="margin-top:8px;gap:14px">
+    <h2 style="margin:0">Hola${S.familia.nombre ? ', familia ' + esc(S.familia.nombre) : ''}</h2>
+    ${up.length ? up.map(c => { const m = member(c.miembroId); const n = daysUntil(c.fecha); return `<div class="card scita" style="gap:6px;border-left:6px solid ${mColor(m)}"><span class="muted">${esc(m?.nombre || '')}</span><b style="font-size:1.25em">${esc(citaTitle(c))}</b><span style="font-size:1.15em"><b>${n === 0 ? 'HOY' : n === 1 ? 'MAÑANA' : esc(fmtLong(c.fecha))}</b>${c.hora ? ' · ' + esc(fmtHora(c.hora)) : ''}</span>${c.lugar ? `<span>${esc(c.lugar)}</span>` : ''}<span class="chips"><button class="btn" data-cita="${c.id}">Ver qué llevar</button><a class="btn" href="${esc(waUrl(c))}" target="_blank" rel="noopener">${ic('share')} Avisar por WhatsApp</a></span></div>`; }).join('')
+      : '<div class="card"><b style="font-size:1.15em">No tienes citas próximas</b></div>'}
+    ${hoyMeds.length ? `<div class="card" style="gap:4px"><b>Medicinas de hoy</b>${hoyMeds.map(md => `<span>${esc(first(member(md.miembroId)))}: ${esc(md.nombre)} · ${md.horas.map(fmtHora).join(', ')}</span>`).join('')}</div>` : ''}
+    ${big('s-citas', 'cal', 'Mis citas', 'Todas las citas que vienen')}
+    ${big('pedir', 'send', 'Pedir una cita', 'Te decimos a dónde llamar y qué decir', 'hot')}
+    ${mode === 'netlify' ? big('gestion', 'check', 'Que un asesor me ayude', `Una persona hace el trámite por usted · ${money(gestPrecio)}`) : ''}
+    ${big('new-cita', 'plus', 'Ya tengo una cita: anotarla', 'Fecha, hora y lugar')}
+    <button class="btn ghost" data-act="s-salir" style="justify-self:center">Salir del modo sencillo</button>
+  </div>`;
+}
+function openMisCitas() {
+  const up = upcoming();
+  openDialog(`${head('Mis citas')}${up.length ? up.map(c => { const m = member(c.miembroId); return `<button class="card" data-cita="${c.id}" style="text-align:left;gap:2px;border-left:6px solid ${mColor(m)}"><b>${esc(citaTitle(c))}</b><span>${esc(m?.nombre || '')} · ${esc(fmtLong(c.fecha))}${c.hora ? ' · ' + esc(fmtHora(c.hora)) : ''}</span>${c.lugar ? `<span class="small muted">${esc(c.lugar)}</span>` : ''}</button>`; }).join('') : '<p>No hay citas próximas.</p>'}`, r => {
+    r.querySelectorAll('[data-cita]').forEach(b => b.onclick = () => openCita(b.dataset.cita));
+  });
+}
+// ---------- guía de los 3 primeros pasos ----------
+function guiaHTML() {
+  if (mode !== 'netlify' || S.ejemplo || rol !== 'admin') return '';
+  try { if (localStorage.getItem('fs-guia-ok') === '1') return ''; } catch (_) {}
+  const p1 = S.miembros.length > 0, p2 = pushState.on, p3 = isStandalone();
+  if (p1 && p2 && p3) return '';
+  const paso = (ok, n, t, act, btn) => `<div class="row" style="gap:10px;align-items:center"><span class="badge ${ok ? 'good' : ''}" style="min-width:28px;justify-content:center">${ok ? '✓' : n}</span><span class="grow" style="${ok ? 'text-decoration:line-through;opacity:.6' : ''}">${t}</span>${ok ? '' : `<button class="btn sm primary" data-act="${act}">${btn}</button>`}</div>`;
+  return `<div class="card" style="gap:10px;margin-top:12px;border-color:var(--accent)"><div class="row"><b class="grow">Empieza en 3 pasos</b><button class="btn ghost sm" data-act="guia-ok">Ocultar</button></div>
+    ${paso(p1, 1, 'Agrega a las personas de tu familia', 'add-member', 'Agregar')}
+    ${paso(p2, 2, 'Activa los recordatorios en este celular', pushCapable() ? 'push-on' : 'install', 'Activar')}
+    ${paso(p3, 3, 'Guárdala como app en la pantalla de inicio', 'install', 'Cómo')}</div>`;
+}
+// ---------- dictado por voz ----------
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+const micHTML = id => SpeechRec ? `<button type="button" class="mic" data-mic="${id}" aria-label="Dictar con la voz" title="Dictar con la voz">${ic('mic')}</button>` : '';
+let dictando = null;
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-mic]'); if (!b || !SpeechRec) return; e.preventDefault();
+  if (dictando) { dictando.stop(); return; }
+  const el = document.getElementById(b.dataset.mic); if (!el) return;
+  const rec = new SpeechRec(); rec.lang = 'es-CO'; rec.interimResults = true; rec.continuous = false;
+  const base = el.value ? el.value.trim() + ' ' : '';
+  rec.onresult = ev => { let t = ''; for (const r of ev.results) t += r[0].transcript; el.value = base + t; el.dispatchEvent(new Event('input', { bubbles: true })); };
+  rec.onerror = ev => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') toast('Permite el micrófono para dictar.'); else if (ev.error !== 'no-speech' && ev.error !== 'aborted') toast('No se pudo dictar. Intenta de nuevo.'); };
+  rec.onend = () => { b.classList.remove('on'); dictando = null; el.focus(); };
+  try { rec.start(); dictando = rec; b.classList.add('on'); toast('Habla ahora…'); } catch (_) { dictando = null; }
+});
 function inicioHTML() {
-  if (!S.miembros.length) return askHTML() + `<div class="empty" style="margin-top:14px"><b>Primero agrega a tu familia</b><span class="muted small">Cada cita, orden y medicamento pertenece a una persona.</span><button class="btn primary" data-act="add-member">Agregar persona</button></div>`;
+  if (!S.miembros.length) return askHTML() + guiaHTML() + `<div class="empty" style="margin-top:14px"><b>Primero agrega a tu familia</b><span class="muted small">Cada cita, orden y medicamento pertenece a una persona.</span><button class="btn primary" data-act="add-member">Agregar persona</button></div>`;
   const up = upcoming(); const next = up[0]; const al = alerts();
   let hero;
   if (next) {
@@ -809,7 +871,7 @@ function inicioHTML() {
       <div class="actions"><button class="btn primary" data-cita="${next.id}">${ic('check')} Alistar</button><a class="btn" href="${esc(gcalUrl(next))}" target="_blank" rel="noopener">${ic('google')} A mi calendario</a><a class="btn" href="${esc(waUrl(next))}" target="_blank" rel="noopener">${ic('share')} WhatsApp</a></div></div></div>`;
   } else hero = `<div class="empty" style="margin-top:14px"><b>No hay citas próximas</b><span class="muted small">Escribe arriba algo como “cita de odontología el lunes a las 9”, o pide una a tu EPS.</span><button class="btn primary" data-act="pedir">${ic('cal')} Pedir una cita</button></div>`;
   const qa = `<div class="qa"><button data-act="pedir">${ic('cal')}<b>Pedir cita a la EPS</b><small>Canales oficiales y qué decir</small></button><button class="hot" data-act="particular">${ic('spark')}<b>Cita particular</b><small>Opciones con precio y calificación</small></button>${mode === 'netlify' ? `<button data-act="gestion" style="grid-column:1/-1">${ic('check')}<b>¿Le cuesta hacer trámites? Un asesor lo hace por usted</b><small>Citas, órdenes, historia clínica y más · ${money(gestPrecio)}</small></button>` : ''}</div>`;
-  return askHTML() + pushBannerHTML() + qa + hero + stripHTML() +
+  return askHTML() + guiaHTML() + pushBannerHTML() + qa + hero + stripHTML() +
     `<div class="sec"><div class="sec-head"><h2>Atención</h2>${al.length ? `<span class="badge ${al.some(a => a.lvl === 'crit') ? 'crit' : 'warn'}">${al.length} ${al.length === 1 ? 'aviso' : 'avisos'}</span>` : ''}</div>
     ${al.length ? al.slice(0, 6).map((a, i) => `<div class="alert ${a.lvl}"><span class="ic">${ic(a.k)}</span><div class="txt"><b>${esc(a.title)}</b><span class="small muted">${esc(a.sub)}</span></div><button class="btn sm" data-alert="${i}">${esc(a.act[0])}</button></div>`).join('') : `<div class="card"><b>Todo en orden</b><span class="small muted">No hay autorizaciones por vencer ni controles atrasados.</span></div>`}</div>
     ${up.length > 1 ? `<div class="sec"><div class="sec-head"><h2>Después</h2><button class="btn ghost sm" data-go2="agenda">Ver agenda completa</button></div>${up.slice(1, 4).map(citaCard).join('')}</div>` : ''}`;
@@ -875,7 +937,7 @@ function saludHTML() {
     h += `<div class="row"><span class="small muted grow">Cuando el médico diga “control en 3 meses”, anótalo aquí.</span><button class="btn primary sm" data-act="add-ctl">${ic('plus')} Agregar</button></div>` + (list.length ? list.map(k => { const m = member(k.miembroId); const n = daysUntil(k.fecha); const cls = k.estado !== 'pendiente' ? 'good' : n < 0 ? 'crit' : n <= 21 ? 'warn' : ''; return `<div class="card"><span class="row"><b class="grow">${esc(k.especialidad)}</b><span class="badge ${cls}">${k.estado !== 'pendiente' ? 'Agendado' : 'Para el ' + fmtDate(k.fecha)}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')}${k.origen ? ' · ' + esc(k.origen) : ''}</span>${k.estado === 'pendiente' ? `<div class="row"><span></span><span class="chips"><button class="btn ghost sm danger" data-del-ctl="${k.id}">Quitar</button><button class="btn sm" data-agendar-ctl="${k.id}">Pedir cita</button></span></div>` : ''}</div>`; }).join('') : `<div class="empty"><b>No hay controles pendientes</b></div>`);
   } else {
     const list = [...S.meds].sort((a, b) => (a.proxima || '9').localeCompare(b.proxima || '9'));
-    h += `<div class="row"><span class="small muted grow">Medicamentos de uso continuo y su próxima entrega.</span><button class="btn primary sm" data-act="add-med">${ic('plus')} Agregar</button></div>` + (list.length ? list.map(md => { const m = member(md.miembroId); const n = daysUntil(md.proxima); const cls = n === null ? '' : n < 0 ? 'crit' : n <= 5 ? 'warn' : 'good'; return `<button class="card" data-med="${md.id}"><span class="row"><b class="grow">${esc(md.nombre)}</b><span class="badge ${cls}">${n === null ? 'Sin fecha' : 'Entrega ' + relDays(n)}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')} · ${esc(md.dosis || '')}${md.frecuencia ? ' · ' + esc(md.frecuencia) : ''}</span></button>`; }).join('') : `<div class="empty"><b>Sin medicamentos</b></div>`);
+    h += `<div class="row"><span class="small muted grow">Medicamentos de uso continuo y su próxima entrega.</span><button class="btn primary sm" data-act="add-med">${ic('plus')} Agregar</button></div>` + (list.length ? list.map(md => { const m = member(md.miembroId); const n = daysUntil(md.proxima); const cls = n === null ? '' : n < 0 ? 'crit' : n <= 5 ? 'warn' : 'good'; return `<button class="card" data-med="${md.id}"><span class="row"><b class="grow">${esc(md.nombre)}</b><span class="badge ${cls}">${n === null ? 'Sin fecha' : 'Entrega ' + relDays(n)}</span></span><span class="small muted"><span class="sw" style="background:${mColor(m)}"></span> ${esc(m?.nombre || '—')} · ${esc(md.dosis || '')}${md.frecuencia ? ' · ' + esc(md.frecuencia) : ''}${(md.horas || []).length ? ` · ${md.aviso === false ? '' : '🔔 '}${md.horas.map(fmtHora).join(', ')}` : ''}</span></button>`; }).join('') : `<div class="empty"><b>Sin medicamentos</b></div>`);
   }
   return h + '</div>';
 }
@@ -894,6 +956,7 @@ function familiaHTML() {
   <div class="sec"><div class="sec-head"><h2>Ajustes</h2><button class="btn ghost sm" data-act="help">${ic('spark')} Ayuda y preguntas</button></div>
     ${mode === 'netlify' && acct ? `<div class="card" style="gap:8px"><span><b>Tu cuenta</b><br><span class="small muted">${esc(acct.email || '')}</span><br><span class="badge ${acct.plan === 'pago' ? 'good' : acct.plan === 'prueba' ? 'accent' : 'crit'}">${acct.plan === 'pago' ? 'Plan activo hasta el ' + fmtDate(String(acct.hasta).slice(0, 10)) : acct.plan === 'prueba' ? `Prueba gratis · ${acct.dias} ${acct.dias === 1 ? 'día' : 'días'}` : 'Plan vencido'}</span><br><span class="small">Plan <b>${esc(acct.tipoNombre || 'Familiar')}</b> · personas ilimitadas</span></span><span class="chips"><button class="btn sm ${acct.plan === 'pago' ? '' : 'primary'}" data-act="plan">${acct.plan === 'pago' ? 'Ver planes' : 'Activar plan'}</button><button class="btn sm" data-act="logout">Cerrar sesión</button></span></div>
     ${acct.refCode ? `<div class="card"><div class="row"><span class="grow"><b>Invita a otra familia y gana 1 mes gratis</b><br><span class="small muted">Cuando una familia que invitaste activa su plan, te sumamos un mes.${acct.referidos ? ` Llevas ${acct.referidos}.` : ''}</span></span><button class="btn sm primary" data-act="ref">${ic('share')} Invitar</button></div></div>` : ''}
+    <div class="card"><div class="row"><span class="grow"><b>Modo sencillo</b><br><span class="small muted">Letra grande y solo lo esencial: ideal para abuelos o para quien no se lleva bien con el celular. Se activa solo en este celular.</span></span><button class="btn sm" data-act="sencillo-on">Activar</button></div></div>
     ${pushCardHTML()}
     <div class="card"><div class="row"><span class="grow"><b>Conectar mi calendario</b><br><span class="small muted">Tus citas aparecen solas en Google Calendar o en el iPhone.</span></span><button class="btn sm" data-act="calendar">Conectar</button></div></div>` : ''}
     <div class="card"><div class="row"><span class="grow"><b>Exportar a Google Sheets o Excel</b><br><span class="small muted">Descarga todas las citas en una tabla.</span></span><button class="btn sm" data-act="csv">Exportar citas</button></div></div>
@@ -935,7 +998,7 @@ function bind(app) {
   app.querySelectorAll('[data-act]').forEach(b => b.onclick = () => ({
     'push-on': () => enablePush(), 'push-off': () => disablePush(), 'push-test': () => testPush(), 'push-later': () => { try { localStorage.setItem('fad-push-no', '1'); } catch (_) {} render(); },
     'add-member': () => openMember(), 'new-cita': () => openCitaForm(), 'plus': () => openPlus(), 'week': () => shareWeek(), 'invite': () => openInvite(), 'inv-si': () => famAction({ accion: 'aceptar' }, 'Te uniste a la familia'), 'inv-no': () => famAction({ accion: 'rechazar' }, 'Invitación rechazada'), 'leave': () => openConfirm('¿Salir de esta familia?', 'Dejarás de ver su agenda. Podrás volver si te invitan de nuevo.', 'Salir', () => famAction({ accion: 'salir' }, 'Saliste de la familia')), 'particular': () => openParticular(), 'guias': () => go('salud', 'guias'), 'help': () => go('ayuda'), 'plan': () => openPlan(), 'calendar': () => openCalendar(), 'csv': () => exportCSV(), 'admin': () => openAdmin(), 'logout': () => doLogout(), 'install': () => openInstall(), 'backup': () => exportData(), 'restore': () => $('#restoreIn').click(), 'privacy': () => openPrivacy(), 'wipe': () => openConfirm('¿Borrar todos tus datos?', 'Se eliminan todas las personas, citas, órdenes, controles, medicamentos y trámites. No se puede deshacer.', 'Borrar todo', async () => { if (mode === 'netlify') { try { await fetch('/api/data', { method: 'DELETE', credentials: 'same-origin' }); } catch (_) {} try { localStorage.removeItem(lsKey()); } catch (_) {} S = emptyState(); view = 'inicio'; render(); toast('Datos borrados de tu cuenta'); return; } S = emptyState(); persist(); view = 'inicio'; render(); toast('Datos borrados'); }), 'add-aut': () => openAut(), 'add-ctl': () => openCtl(), 'add-med': () => openMed(),
-    'clear-day': () => { dayFilter = null; render(); }, 'ref': () => shareRef(), 'gestion': () => openGestion({}), 'pedir': () => openPedir({}), 'close-answer': () => { answer = null; render(); },
+    'clear-day': () => { dayFilter = null; render(); }, 's-citas': () => openMisCitas(), 's-salir': () => setSencillo(false), 'sencillo-on': () => setSencillo(true), 'guia-ok': () => { try { localStorage.setItem('fs-guia-ok', '1'); } catch (_) {} render(); }, 'ref': () => shareRef(), 'gestion': () => openGestion({}), 'pedir': () => openPedir({}), 'close-answer': () => { answer = null; render(); },
     'clear-demo': () => openConfirm('¿Borrar la familia de ejemplo?', 'Se eliminan los datos de ejemplo para que empieces con los tuyos.', 'Borrar ejemplo', () => { const c = S.consent; S = emptyState(); S.consent = c; persist(); view = 'familia'; render(); openMember(); }),
   })[b.dataset.act]?.());
 }
@@ -1125,7 +1188,7 @@ function openCitaForm(pre = {}) {
   openDialog(`${head(editing ? 'Editar cita' : pre.fromAI ? 'Revisa y guarda' : 'Nueva cita')}
     ${pre.fromAI ? `<div class="answer" style="margin:0"><b style="color:var(--ai)">${ic('spark')} Llené esto con lo que escribiste. Revisa antes de guardar.</b></div>` : ''}
     ${!editing && !pre.fromAI ? `<details class="answer" style="margin:0" ${pre.photo ? 'open' : ''}><summary style="cursor:pointer;font-weight:700;color:var(--ai)">${ic('spark')} Leer mensaje${photoOn() ? ' o foto' : ''} de la EPS</summary>
-      <div style="display:grid;gap:10px;margin-top:10px"><label class="f"><span class="small">Mensaje</span><textarea id="ai-text" placeholder="Ej.: Su cita de medicina interna quedó asignada para el 14/11 a las 7:40 a. m. en la sede norte…"></textarea></label>
+      <div style="display:grid;gap:10px;margin-top:10px"><label class="f"><span class="small">Mensaje (puedes dictarlo)</span><span class="fmic"><textarea id="ai-text" placeholder="Ej.: Su cita de medicina interna quedó asignada para el 14/11 a las 7:40 a. m. en la sede norte…"></textarea>${micHTML('ai-text')}</span></label>
       ${photoOn() ? `<label class="f"><span class="small">Foto de la orden, autorización o del mensaje (opcional)</span><input type="file" id="ai-img" accept="image/*"></label>` : ''}
       <div class="row"><span class="small muted" id="ai-status">${aiOn() ? 'Revisa siempre los datos antes de guardar.' : 'La lectura automática necesita una cuenta. Llena el formulario.'}</span><button class="btn sm" type="button" id="ai-go" ${aiOn() ? '' : 'disabled'}>Leer y llenar</button></div></div></details>` : ''}
     <div class="fields">
@@ -1190,7 +1253,7 @@ ${text ? 'Mensaje:\n' + text : 'Lee la imagen adjunta.'}`;
         if (pre.gestionId) { const g = gest.find(x => x.id === pre.gestionId); if (g) g.agregada = true; gestPost({ accion: 'agregada', id: pre.gestionId }).catch(() => {}); }
         if (aiAut) S.auts.push({ id: uid(), miembroId: data.miembroId, servicio: data.especialidad || TIPOS[tipo].label, numero: aiAut.numero || '', exp: todayISO(), vence: okDate(aiAut.vence), estado: 'usada', citaId: nc.id });
       }
-      persist(); dlg.close(); answer = null; render(); const rp2 = r.querySelector('#cf-rep')?.value; toast(editing ? 'Cita actualizada' : rp2 && rp2 !== '0' ? 'Citas guardadas' : `Cita guardada · ${fmtDate(fecha)}`);
+      persist(); dlg.close(); answer = null; render(); const rp2 = r.querySelector('#cf-rep')?.value; const nueva = !editing && S.citas[S.citas.length - 1]; if (nueva && !(rp2 && rp2 !== '0')) toast(`Cita guardada · ${fmtDate(fecha)}`, () => window.open(waUrl(nueva), '_blank', 'noopener'), 'Avisar por WhatsApp'); else toast(editing ? 'Cita actualizada' : rp2 && rp2 !== '0' ? 'Citas guardadas' : `Cita guardada · ${fmtDate(fecha)}`);
     };
   });
 }
@@ -1270,6 +1333,17 @@ function openCtl(pre = {}) {
   });
 }
 
+// "8 am, 8:30pm, 20:00, 14" → ["08:00","20:30","20:00","14:00"]
+function parseHoras(t) {
+  const out = [];
+  String(t || '').toLowerCase().replace(/\./g, '').split(/[,;y\/]+|\s{2,}/).map(x => x.trim()).filter(Boolean).forEach(x => {
+    const m = x.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm|a m|p m)?$/); if (!m) return;
+    let h = +m[1]; const mi = +(m[2] || 0); const ap = (m[3] || '').replace(' ', '');
+    if (ap === 'pm' && h < 12) h += 12; if (ap === 'am' && h === 12) h = 0;
+    if (h > 23 || mi > 59) return; const v = `${pad(h)}:${pad(mi)}`; if (!out.includes(v)) out.push(v);
+  });
+  return out.sort().slice(0, 8);
+}
 function openMed(id, pre = {}) {
   if (!S.miembros.length) { openMember(); return; }
   const md = id ? S.meds.find(x => x.id === id) : pre;
@@ -1280,6 +1354,8 @@ function openMed(id, pre = {}) {
       <label class="f full">Medicamento<input id="md-n" value="${esc(md.nombre || '')}" placeholder="Nombre y concentración"></label>
       <label class="f">Dosis<input id="md-d" value="${esc(md.dosis || '')}" placeholder="Ej.: 1 tableta"></label>
       <label class="f">Frecuencia<input id="md-f" value="${esc(md.frecuencia || '')}" placeholder="Ej.: cada 12 horas"></label>
+      <label class="f full">Horas para tomarla (opcional)<input id="md-h" value="${esc((md.horas || []).map(fmtHora).join(', '))}" placeholder="Ej.: 8 am, 8 pm"></label>
+      <label class="row full small" style="gap:8px"><input type="checkbox" id="md-av" ${md.aviso === false ? '' : 'checked'}> Avisar al celular a esas horas${mode === 'netlify' && !pushState.on ? ' (activa los recordatorios en Familia > Ajustes)' : ''}</label>
     </div>
     <div class="dlg-foot">${id ? '<button class="btn ghost danger" id="md-del">Eliminar</button><button class="btn" id="md-next">Ya la reclamé (+30 días)</button>' : ''}<button class="btn" id="md-cancel">Cancelar</button><button class="btn primary" id="md-save">Guardar</button></div>`, r => {
     r.querySelector('#md-cancel').onclick = () => dlg.close();
@@ -1287,7 +1363,8 @@ function openMed(id, pre = {}) {
     r.querySelector('#md-next')?.addEventListener('click', () => { md.proxima = addDays(md.proxima && daysUntil(md.proxima) > 0 ? md.proxima : todayISO(), 30); persist(); dlg.close(); render(); toast('Próxima entrega: ' + fmtDate(md.proxima)); });
     r.querySelector('#md-save').onclick = () => {
       const n = val(r, 'md-n'); if (!n) { r.querySelector('#md-n').focus(); toast('Falta el medicamento'); return; }
-      const data = { miembroId: val(r, 'md-m'), proxima: val(r, 'md-p'), nombre: n, dosis: val(r, 'md-d'), frecuencia: val(r, 'md-f') };
+      const horas = parseHoras(val(r, 'md-h')); if (val(r, 'md-h') && !horas.length) { toast('No entendimos las horas. Escribe por ejemplo: 8 am, 8 pm'); return; }
+      const data = { miembroId: val(r, 'md-m'), proxima: val(r, 'md-p'), nombre: n, dosis: val(r, 'md-d'), frecuencia: val(r, 'md-f'), horas, aviso: r.querySelector('#md-av').checked };
       if (id) Object.assign(md, data); else S.meds.push(Object.assign({ id: uid() }, data));
       persist(); dlg.close(); answer = null; view = 'salud'; salud = 'meds'; render(); toast('Medicamento guardado');
     };
@@ -1444,7 +1521,7 @@ function openGestion(pre = {}) {
       <p class="small" style="margin:0">${sv === 'cita' ? 'Pedimos la cita a la EPS por sus canales oficiales. Cuando la tengamos te avisamos y la agregas a tu agenda con un toque.' : sv === 'radicar' ? 'Enviamos la orden a la EPS por sus canales oficiales para que la autoricen, y te avisamos el número de radicado y la respuesta.' : sv === 'historia' ? 'Pedimos la copia de la historia clínica a la institución. Si la historia no es tuya, puede que te pidamos una autorización firmada por la persona.' : 'Cuéntanos qué pasa y un asesor te ayuda con el trámite ante la EPS.'} <b>Valor: ${money(gestPrecio)}</b>. Si no lo logramos, te devolvemos el dinero.</p>
       <form id="gs-f" class="fields">
         <label class="f">¿Para quién?<select id="gs-m">${memberOptions(mid)}</select></label>
-        <label class="f">${esc(X.que)}<input id="gs-que" required value="${esc(keep.que ?? pre.que ?? '')}" placeholder="${esc(X.ph)}"></label>
+        <label class="f">${esc(X.que)}<span class="fmic"><input id="gs-que" required value="${esc(keep.que ?? pre.que ?? '')}" placeholder="${esc(X.ph)}">${micHTML('gs-que')}</span></label>
         ${falta(m) ? `<div class="notice full" style="margin:0"><span>A ${esc(first(m))} le falta ${!m.doc && !m.eps ? 'el documento y la EPS' : !m.doc ? 'el número de documento' : 'la EPS'}. Lo necesitamos para hacer el trámite.</span><button class="btn sm primary" type="button" id="gs-edit">Completar</button></div>`
           : `<p class="small muted full" style="margin:0">${esc(m.nombre)} · ${esc(docLabel(m))} · ${esc(m.eps)}${m.regimen ? ' (' + esc(m.regimen) + ')' : ''}</p>`}
         <label class="f">${esc(X.lugar)}<input id="gs-ciudad" value="${esc(keep.ciudad ?? (S.familia && S.familia.ciudad) ?? '')}" placeholder="Ej.: Armenia, sede norte"></label>
@@ -1452,7 +1529,7 @@ function openGestion(pre = {}) {
         <label class="f">Celular de contacto (WhatsApp)<input id="gs-tel" required inputmode="tel" value="${esc(keep.tel ?? tel)}" placeholder="300 123 4567"></label>
         <label class="f full">${esc(X.foto)}<input type="file" id="gs-foto" accept="image/*"></label>
         <div id="gs-lec" class="full" style="display:grid">${lecturaHTML(lectura)}</div>
-        <label class="f full">Algo más que debamos saber (opcional)<textarea id="gs-notas" placeholder="Ej.: es control de un examen, prefiere doctora, la EPS dice que no hay agenda…">${esc(keep.notas || '')}</textarea></label>
+        <label class="f full">Algo más que debamos saber (opcional)<span class="fmic"><textarea id="gs-notas" placeholder="Ej.: es control de un examen, prefiere doctora, la EPS dice que no hay agenda…">${esc(keep.notas || '')}</textarea>${micHTML('gs-notas')}</span></label>
         <label class="row full small" style="gap:8px;align-items:flex-start"><input type="checkbox" id="gs-ok" style="margin-top:3px"><span>Autorizo a Emnova (FamiliSalud) a usar estos datos para hacer este trámite ante la EPS o la institución de salud en nombre de esta persona, según la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a>.</span></label>
         <div class="dlg-foot full"><button class="btn" type="button" id="gs-x">Cancelar</button><button class="btn primary" type="submit" ${falta(m) ? 'disabled' : ''}>Pedir ayuda del asesor</button></div>
       </form>`, r => {
@@ -1559,6 +1636,8 @@ async function openAdmin() {
       <div class="chips"><span class="small muted">Tipo:</span><button class="btn sm" data-tipo="familiar" data-u="${esc(c.userId)}" aria-pressed="${c.tipo !== 'empresa'}">Familiar</button><input type="number" min="1" max="200" inputmode="numeric" aria-label="Personas con acceso (Empresa)" id="adn-${esc(c.userId)}" value="${c.tipo === 'empresa' ? c.cupo : 30}" style="width:4.5em"><button class="btn sm" data-tipo="empresa" data-u="${esc(c.userId)}" aria-pressed="${c.tipo === 'empresa'}">Empresa</button></div></div>`;
   const list = () => j.cuentas.filter(c => !filt || (c.email || '').toLowerCase().includes(filt.toLowerCase())).slice(0, 80).map(card).join('') || '<span class="muted">Sin resultados.</span>';
   const stats = () => `<div><b>${j.total}</b><span class="small muted">cuentas</span></div><div><b>${j.prueba}</b><span class="small muted">en prueba</span></div><div><b>${j.pagos}</b><span class="small muted">pagando</span></div>`;
+  const R = j.resumen || {};
+  const resumenHTML = () => j.resumen ? `<div class="feat" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b>${money(R.ingresosMes || 0)}</b><span class="small muted">ingresos este mes (${R.pagosMes || 0} pagos)</span></div><div><b>${R.asesoriasPendientes || 0}</b><span class="small muted">asesorías por atender</span></div><div><b>${R.vencenSemana || 0}</b><span class="small muted">planes vencen esta semana</span></div><div><b>${(R.usoIA && R.usoIA.asistente) || 0} · ${(R.usoIA && R.usoIA.busqueda) || 0}</b><span class="small muted">consultas IA · búsquedas este mes</span></div></div>${R.correo ? '' : '<p class="small muted" style="margin:0">Correos automáticos: apagados (falta configurar Resend).</p>'}` : '';
   const send = async (userId, body) => {
     const res = await fetch('/api/admin', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(Object.assign({ userId }, body)) });
     const k = await res.json().catch(() => ({})); if (!res.ok) throw new Error(k.error || 'No se pudo guardar.');
@@ -1567,6 +1646,7 @@ async function openAdmin() {
   };
   openDialog(`${head('Administración')}
     <div class="feat" id="ad-stats" style="grid-template-columns:repeat(3,minmax(0,1fr))">${stats()}</div>
+    ${resumenHTML()}
     <div class="seg" role="group" aria-label="Sección" id="ad-seg"><button aria-pressed="true" data-tab="c">Clientes</button><button aria-pressed="false" data-tab="g">Asesorías <span id="ad-gn"></span></button><button aria-pressed="false" data-tab="e">EPS <span id="ad-en"></span></button></div>
     <div id="ad-tc" style="display:grid;gap:12px">
     <p class="small muted" style="margin:0">Activa el plan solo cuando veas el pago en tu Nequi. Cada cambio se guarda al instante y el cliente lo ve al volver a abrir la app. Al activar el primer pago de una familia invitada, quien la invitó gana 1 mes automáticamente.</p>
@@ -1583,9 +1663,9 @@ async function openAdmin() {
       const u = b.dataset.u || b.dataset.undo; const c = j.cuentas.find(x => x.userId === u);
       box.querySelectorAll('button').forEach(x => x.disabled = true); const old = b.textContent; b.textContent = 'Guardando…';
       try {
-        if (b.dataset.undo) { const pv = last[u].prev; await (pv.tipo ? send(u, { accion: 'plan', tipo: pv.tipo, cupo: pv.cupo }) : send(u, { accion: 'restaurar', pagoHasta: pv.pagoHasta ?? null, trialHasta: pv.trialHasta })); delete last[u]; toast('Cambio deshecho'); }
+        if (b.dataset.undo) { const pv = last[u].prev; await (pv.tipo ? send(u, { accion: 'plan', tipo: pv.tipo, cupo: pv.cupo }) : send(u, { accion: 'restaurar', pagoHasta: pv.pagoHasta ?? null, trialHasta: pv.trialHasta, deshace: last[u].accion })); delete last[u]; toast('Cambio deshecho'); }
         else if (b.dataset.tipo) { const prev = { tipo: c.tipo || 'familiar', cupo: c.cupo || 30 }; const n = b.dataset.tipo === 'empresa' ? Number((document.getElementById('adn-' + u) || {}).value) : undefined; const nc = await send(u, { accion: 'plan', tipo: b.dataset.tipo, cupo: n }); last[u] = { prev, msg: `Plan cambiado a ${nc.tipoNombre}${nc.tipo === 'empresa' ? ` (${nc.cupo} personas con acceso)` : ''}.` }; toast('Guardado'); }
-        else { const prev = { pagoHasta: c.pagoHasta ?? null, trialHasta: c.trialHasta }; const nc = await send(u, { accion: b.dataset.ad }); last[u] = { prev, msg: `${ACC[b.dataset.ad]}. Ahora: ${estado(nc)}.` }; toast('Guardado'); }
+        else { const prev = { pagoHasta: c.pagoHasta ?? null, trialHasta: c.trialHasta }; const nc = await send(u, { accion: b.dataset.ad }); last[u] = { prev, accion: b.dataset.ad, msg: `${ACC[b.dataset.ad]}. Ahora: ${estado(nc)}.` }; toast('Guardado'); }
       } catch (err) { toast(err.message || 'No se pudo guardar.'); b.textContent = old; }
       redraw(); const el = document.getElementById('adc-' + u); if (el) el.scrollIntoView({ block: 'nearest' });
     });
@@ -2176,9 +2256,9 @@ function openPrivacy() {
 }
 
 let toastT = null;
-function toast(msg, undo) {
+function toast(msg, undo, label) {
   const t = $('#toast'), a = $('#toastAct'); $('#toastMsg').textContent = msg; t.hidden = false;
-  a.hidden = !undo; a.onclick = undo ? () => { t.hidden = true; undo(); } : null;
+  a.textContent = label || 'Deshacer'; a.hidden = !undo; a.onclick = undo ? () => { t.hidden = true; undo(); } : null;
   clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, undo ? 6000 : 2600);
 }
 

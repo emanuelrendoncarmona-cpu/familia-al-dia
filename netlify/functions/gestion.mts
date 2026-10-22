@@ -1,7 +1,7 @@
 // /api/gestion — "Asesor FamiliSalud": la familia paga para que una persona del equipo haga un trámite con la EPS (sacar cita, radicar orden, pedir historia clínica u otro).
 // Flujo: pago → proceso (pago recibido) → [radicado (esperando respuesta de la EPS, con plazo legal)] → lista | no (se devuelve el dinero).
 import type { Config } from "@netlify/functions";
-import { requireUser, isAdmin, stores, json, resolveFamily, PRECIOS } from "../../lib/common.mts";
+import { requireUser, isAdmin, stores, json, resolveFamily, PRECIOS, registrarIngreso } from "../../lib/common.mts";
 import { SERVICIOS, avisar, txt, plazoRespuesta, type Estado, type Servicio, type Gestion } from "../../lib/gestiones.mts";
 
 const nuevoId = () => { const b = new Uint8Array(9); crypto.getRandomValues(b); return Array.from(b, x => x.toString(16).padStart(2, "0")).join(""); };
@@ -50,6 +50,9 @@ export default async (req: Request) => {
         g.resultado = { fecha: conFecha ? r.fecha : "", hora: /^\d{2}:\d{2}$/.test(String(r.hora || "")) ? r.hora : "", lugar: txt(r.lugar, 200), notas: txt(r.notas, 500), autorizacion: aut, aprobada: typeof r.aprobada === "boolean" ? r.aprobada : aut ? true : null };
       }
       if (estado === "no") g.nota = txt(body.nota, 500) || "No fue posible completar el trámite. Te devolvemos el dinero.";
+      const antes = g.estado;
+      if (estado === "proceso" && antes === "pago") await registrarIngreso(`Asesor: ${SERVICIOS[g.servicio || "cita"]}`, g.precio, g.email);
+      if (estado === "no" && (antes === "proceso" || antes === "radicado")) await registrarIngreso("Devolución asesoría", -g.precio, g.email);
       g.estado = estado; g.actualizada = new Date().toISOString();
       await gs.setJSON(key, g);
       if (estado === "lista" || estado === "no") await gs.delete(`foto/${g.famId}/${g.id}`); // la foto de la orden ya no se necesita

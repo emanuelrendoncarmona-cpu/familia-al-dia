@@ -67,6 +67,34 @@ export default async () => {
       }
     }
   }
+  // Medicamentos: aviso a la hora de tomarlos (ventana de 10 minutos desde la hora indicada).
+  const { blobs: mb } = await idx.list({ prefix: "meds/" });
+  for (const { key } of mb) {
+    const famId = key.slice(5);
+    const a: any = await stores.agendas().get(famId, { type: "json" });
+    if (!a || a.ejemplo || !Array.isArray(a.meds)) continue;
+    const toca: { md: any; h: string }[] = [];
+    for (const md of a.meds) {
+      if (!Array.isArray(md.horas) || md.aviso === false) continue;
+      for (const h of md.horas) { if (!/^\d{2}:\d{2}$/.test(h)) continue; const t = Date.parse(`${hoy}T${h}:00-05:00`); if (now >= t && now < t + 10 * MIN) toca.push({ md, h }); }
+    }
+    if (!toca.length) continue;
+    const fam = (await famStores.familias().get(famId, { type: "json" })) as Familia | null;
+    const cuenta = (await stores.cuentas().get(fam?.ownerId || famId, { type: "json" })) as Cuenta | null;
+    if (!cuenta || !estadoCuenta(cuenta).activo) continue;
+    const ids = fam ? fam.miembros.map(m => m.userId) : [famId];
+    const who = (id: string) => (a.miembros || []).find((m: any) => m.id === id)?.nombre?.split(" ")[0] || "";
+    for (const { md, h } of toca) {
+      const k = `${famId}/med-${md.id}-${hoy}-${h}`;
+      if (await enviados.get(k)) continue;
+      await enviados.set(k, new Date().toISOString());
+      const data = { title: `Hora de la medicina${who(md.miembroId) ? " de " + who(md.miembroId) : ""}`, body: `${md.nombre}${md.dosis ? " · " + md.dosis : ""} (${hora12(h)})`, tag: `med-${md.id}`, url: "/" };
+      for (const id of ids) {
+        const reg = ((await subsStore.get(id, { type: "json" })) as { subs: Sub[] } | null) || { subs: [] };
+        for (const sub of reg.subs) { try { const st = await sendPush(sub, data, { ttl: 1800 }); if (st < 300) total++; } catch {} }
+      }
+    }
+  }
   console.log("[recordatorios] enviados", total);
 };
 
