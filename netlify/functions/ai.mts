@@ -11,7 +11,7 @@ const HELP = `Eres el asistente de ayuda de "FamiliSalud", una app colombiana pa
 Cómo funciona la app:
 - Inicio: muestra la próxima cita con cuenta regresiva, una franja de 14 días y avisos (citas cercanas, autorizaciones por vencer, controles, medicamentos y trámites esperando respuesta).
 - Botón + (abajo al centro): pedir una cita a la EPS, guardar una cita que ya tienes, guardar una orden/autorización, anotar un control o un medicamento.
-- Pedir cita: muestra los canales oficiales de la EPS de la persona (web, WhatsApp, app, teléfonos) y un texto de "qué decir". Si queda pendiente, se guarda en Salud > Trámites y avisa a los 5 días con una guía de reclamo (otro canal, PQRD ante la EPS, Superintendencia de Salud, tutela).
+- Pedir cita: muestra los canales oficiales de la EPS de la persona (incluye regímenes especiales: Sanidad Militar, Sanidad Policía y FOMAG del magisterio) (web, WhatsApp, app, teléfonos) y un texto de "qué decir". Si queda pendiente, se guarda en Salud > Trámites y avisa a los 5 días con una guía de reclamo (otro canal, PQRD ante la EPS, Superintendencia de Salud, tutela).
 - Cada cita tiene lista de qué llevar, botón para Google Calendar y para enviarla por WhatsApp. Al marcarla como asistida pregunta si dejó un control o una orden nueva.
 - Barra del asistente: escribe "cita de mi mamá el jueves a las 3 pm" y llena el formulario; también responde preguntas sobre tu agenda.
 - Leer foto: en Nueva cita, "Leer mensaje o foto de la EPS" permite subir la foto de la orden o pegar el SMS.

@@ -324,7 +324,7 @@ const TIPOS = {
   otra: { label: 'Otra', req: ['Documento de identidad'] },
 };
 // Canales oficiales verificados en el sitio de cada EPS el 20 de octubre de 2026. Cambian seguido: revisar cada mes.
-const EPS_VERIFIED = '20 oct 2026';
+const EPS_VERIFIED = 'oct 2026';
 const EPS = [
   { k: 'nueva', n: 'Nueva EPS', match: /nueva\s*eps/i, web: ['Pedir cita en línea', 'https://solucionjb.nuevaeps.com.co/NEPS_Citasweb-1.0-SNAPSHOT/login.xhtml'], app: ['App Afiliados', 'https://app.nuevaeps.com.co/#/'], wa: '573214459657', waName: 'EVA', tels: { contributivo: [['Nacional', '018000954400'], ['Bogotá', '6013077022']], subsidiado: [['Nacional', '018000952000'], ['Bogotá', '6013077051']] }, more: 'https://www.nuevaeps.com.co/personas/canales-no-presenciales-ecosistema-de-servicios' },
   { k: 'sanitas', n: 'EPS Sanitas', match: /sanitas/i, web: ['Citas médicas en línea', 'https://www.epssanitas.com/usuarios/web/nuevo-portal-eps/citas-medicas'], app: ['App EPS Sanitas (Android)', 'https://play.google.com/store/apps/details?id=colsanitas.foonkiemonkey.com.co.eps'], app2: ['App EPS Sanitas (iPhone)', 'https://itunes.apple.com/co/app/eps-sanitas/id960869433?mt=8'], wa: '573202550525', waName: 'Ana María', tels: [['Bogotá', '6013759000'], ['Medellín', '6045908383'], ['Cali', '6023989340'], ['Barranquilla', '6053226888'], ['Nacional (fijo)', '018000919100'], ['Desde celular', '#936']] },
@@ -340,6 +340,19 @@ const EPS = [
   { k: 'asmet', n: 'Asmet Salud', match: /asmet/i, web: ['Oficina virtual', 'https://oficinavirtual.asmetsalud.com/#/ov/afiliados'], wa: '573106213604', tels: [['Nacional (fijo)', '018000913876'], ['Desde celular', '6028353783']] },
   { k: 'emssanar', n: 'Emssanar', match: /emssanar/i, web: ['Sitio web', 'https://www.emssanar.org.co'], tels: [['Nacional', '018000129393']] },
   { k: 'aliansalud', n: 'Aliansalud', match: /aliansalud/i, web: ['Canales de atención', 'https://www.aliansalud.com.co/Paginas/Canales-de-atencion.aspx'], tels: [['Bogotá', '6017568000'], ['Nacional', '018000123703']] },
+  { k: 'comfenalco', n: 'Comfenalco Valle EPS', match: /comfenalco\s*valle|eps\s*delagente/i, tels: [['Cali (EPS)', '6024853530']], more: 'https://www.comfenalcovalle.com.co/en/personas/servicio-al-cliente/ruta-de-menu-telefonico/' },
+  { k: 'saludmia', n: 'Salud Mía EPS', match: /salud\s*m[ií]a/i, tels: [['Nacional', '018000980001']], more: 'https://www.saludmia.org/saludmia/contactanos' },
+  { k: 'familiar', n: 'EPS Familiar de Colombia', match: /familiar\s*de\s*colombia/i, web: ['Portal de afiliados', 'https://eps.familiardecolombia.com'], tels: [['Nacional (24 horas)', '018000417802'], ['Conmutador', '6052798923']], more: 'https://www.epsfamiliardecolombia.com/canales-de-atencion' },
+  { k: 'comfaoriente', n: 'Comfaoriente EPS-S', match: /comfaoriente/i, web: ['EPS Virtual (autorizaciones)', 'https://epsonline.comfaoriente.com/login/afiliado/'], wa: '573183492815', waName: 'servicios', tels: [['Nacional', '018000962055'], ['Cúcuta', '6075755560']], more: 'https://comfaoriente.com/eps/' },
+  { k: 'comfachoco', n: 'Comfachocó EPS-S', match: /comfachoc/i, tels: [['Nacional', '018000942565'], ['Quibdó (PBX)', '6042040767']], more: 'https://comfachoco.com/comfachocoepsweb/' },
+  { k: 'dusakawi', n: 'Dusakawi EPSI', match: /dusakawi/i, tels: [['Nacional', '018000915006'], ['Celular', '3204069235']], more: 'https://dusakawiepsi.com/' },
+  { k: 'pijaos', n: 'Pijaos Salud EPSI', match: /pijaos/i, web: ['Oficina virtual', 'https://prestadores.pijaossalud.com/OFICINA_VIRTUAL/pages/login.php'], tels: [['Nacional', '018000186754'], ['Ibagué', '6082809086'], ['Pereira', '6063455547']], more: 'https://www.pijaossalud.com/' },
+  { k: 'cajacopi', n: 'Cajacopi EPS', match: /cajacopi/i, tels: [], more: 'https://www.cajacopieps.com/' },
+  { k: 'mallamas', n: 'Mallamas EPSI', match: /mallamas/i, tels: [], more: 'http://www.mallamaseps.com.co/' },
+  // Regímenes especiales y de excepción: las citas se piden en el establecimiento o prestador asignado.
+  { k: 'militar', n: 'Sanidad Militar (Fuerzas Militares)', especial: true, match: /sanidad\s*militar|fuerzas\s*militares|\bdgsm\b|ej[eé]rcito|armada|fuerza\s*a[eé]rea|\bfac\b/i, tels: [['Call center de citas (Bogotá)', '6017944222'], ['Jefatura Salud FAC', '6013487030']], nota: 'Citas de medicina y odontología, generales y especializadas. Para confirmar o cancelar hay respuesta automática las 24 horas. En otras ciudades, pide la cita en tu establecimiento de sanidad militar.', more: 'https://www.sanidadfuerzasmilitares.mil.co/?idcategoria=429' },
+  { k: 'policia', n: 'Sanidad Policía Nacional', especial: true, match: /polic[ií]a|\bdisan\b|sanidad\s*polic/i, tels: [['Bogotá (citas)', '6013788990'], ['Medellín (citas)', '6042961000'], ['Cali (citas)', '6025240930'], ['Barranquilla (citas)', '6053930070'], ['Bucaramanga (citas)', '6077008640'], ['Pereira (citas)', '6063401575'], ['Armenia (citas)', '6067368926'], ['Manizales (citas)', '3232540189']], nota: 'Cada departamento tiene su línea de asignación y cancelación de citas. Si tu ciudad no está aquí, búscala en el directorio oficial.', more: 'https://www.policia.gov.co/sites/default/files/descargables/DIRECTORIO%20citas%20medicas%20nivel%20nacional.pdf' },
+  { k: 'fomag', n: 'FOMAG (Magisterio)', especial: true, match: /fomag|magisterio|docente/i, tels: [['Línea de salud (Bogotá)', '6019169223'], ['Línea de salud (nacional)', '018000160500']], nota: 'Las citas se piden con el prestador de salud asignado en tu región. La línea de salud te dice cuál es y te orienta.', more: 'https://www.fomag.gov.co/preguntas_frecuentes/canales-de-atencion/' },
 ];
 const ADRES_URL = 'https://aplicaciones.adres.gov.co/BDUA_Internet/Pages/ConsultarAfiliadoWeb_2.aspx';
 const SUPERSALUD_URL = 'https://www.supersalud.gov.co';
@@ -1167,7 +1180,7 @@ function openMember(id) {
       <label class="f">Parentesco<input id="mm-p" value="${esc(m.parentesco || '')}" placeholder="Yo, hija, mamá…" list="parentescos"><datalist id="parentescos"><option>Yo</option><option>Pareja</option><option>Hija</option><option>Hijo</option><option>Mamá</option><option>Papá</option><option>Abuela</option><option>Abuelo</option></datalist></label>
       <label class="f">Fecha de nacimiento<input type="date" id="mm-nac" value="${esc(m.nac || '')}"></label>
       <label class="f">EPS<input id="mm-eps" value="${esc(m.eps || '')}" list="eps-list" placeholder="Escribe o elige"><datalist id="eps-list">${EPS.map(e => `<option>${esc(e.n)}</option>`).join('')}</datalist></label>
-      <label class="f">Régimen<select id="mm-reg"><option value="">No sé</option><option value="contributivo" ${m.regimen === 'contributivo' ? 'selected' : ''}>Contributivo</option><option value="subsidiado" ${m.regimen === 'subsidiado' ? 'selected' : ''}>Subsidiado</option></select></label>
+      <label class="f">Régimen<select id="mm-reg"><option value="">No sé</option><option value="contributivo" ${m.regimen === 'contributivo' ? 'selected' : ''}>Contributivo</option><option value="subsidiado" ${m.regimen === 'subsidiado' ? 'selected' : ''}>Subsidiado</option><option value="especial" ${m.regimen === 'especial' ? 'selected' : ''}>Especial (militar, policía, magisterio)</option></select></label>
       <label class="f">Tipo de documento<select id="mm-tipodoc">${Object.entries(TIPODOC).map(([k, t]) => `<option value="${k}" ${((m.tipoDoc || 'CC') === k) ? 'selected' : ''}>${k} · ${t}</option>`).join('')}</select></label>
       <label class="f">N.° de documento<input id="mm-doc" value="${esc(m.doc || '')}" inputmode="numeric" placeholder="Solo el número"></label>
       <p class="small muted full" style="margin:0">¿No sabes a qué EPS está afiliado? <a href="${ADRES_URL}" target="_blank" rel="noopener">Consúltalo en ADRES</a>.</p>
@@ -1880,11 +1893,13 @@ function channelsHTML(m, que, pre) {
   const msg = scriptFor(m, que, pre);
   const tels = Array.isArray(e.tels) ? e.tels : (e.tels[m.regimen] || [...e.tels.contributivo, ...e.tels.subsidiado.map(([a, b]) => [a + ' (subsidiado)', b])]);
   const link = (lbl, url, cls = '', id = '') => `<a class="btn ${cls}" ${id ? `id="${id}" data-wa="${e.wa}"` : ''} href="${esc(url)}" target="_blank" rel="noopener" data-ch="${esc(lbl)}">${lbl.toLowerCase().includes('app') ? ic('share') : ic('send')} ${esc(lbl)}</a>`;
-  return `<div class="card" style="gap:10px"><div class="row"><b class="grow">Pedir a ${esc(e.n)}</b><span class="small muted">Verificado ${EPS_VERIFIED}</span></div>
+  return `<div class="card" style="gap:10px"><div class="row"><b class="grow">Pedir a ${esc(e.n)}</b>${tels.length || e.web || e.wa ? `<span class="small muted">Verificado ${EPS_VERIFIED}</span>` : ""}</div>
     <div class="actions" style="margin:0">${e.web ? link(e.web[0], e.web[1], 'primary') : ''}${e.wa ? link(`WhatsApp${e.waName ? ' (' + e.waName + ')' : ''}`, `https://wa.me/${e.wa}?text=${encodeURIComponent(msg)}`, '', 'pd-wa') : ''}${e.app ? link(e.app[0], e.app[1]) : ''}${e.app2 ? link(e.app2[0], e.app2[1]) : ''}${e.extra ? link(e.extra[0], e.extra[1], 'ghost') : ''}</div>
     ${tels.length ? `<div class="checklist">${tels.map(([lbl, n]) => `<div class="row telrow"><span class="num"><span class="small muted">${esc(lbl)}</span><br><span class="mono">${esc(fmtTel(n))}</span></span><span class="chips"><a class="btn sm" href="tel:${encodeURIComponent(n)}" data-ch="Teléfono">Llamar</a><button class="btn sm" data-copy="${esc(n)}">Copiar</button></span></div>`).join('')}</div>` : ''}
+    ${e.nota ? `<span class="small">${esc(e.nota)}</span>` : ''}
+    ${!tels.length && !e.web && !e.wa ? '<span class="small muted">Aún no pudimos verificar sus líneas. Usa el número del carné o el de su página oficial.</span>' : ''}
     ${e.wa && !e.waCitas ? '<span class="small muted">El WhatsApp de esta EPS atiende varios trámites; si no asigna citas, te dice por dónde pedirla.</span>' : ''}
-    ${e.more ? `<a class="btn ghost sm" href="${esc(e.more)}" target="_blank" rel="noopener">Ver todos los canales de ${esc(e.n)}</a>` : ''}</div>`;
+    ${e.more ? `<a class="btn ${!tels.length && !e.web && !e.wa ? 'primary' : 'ghost'} sm" href="${esc(e.more)}" target="_blank" rel="noopener">Ver canales oficiales de ${esc(e.n)}</a>` : ''}</div>`;
 }
 function openPedir(pre = {}) {
   if (!S.miembros.length) { openMember(); return; }
