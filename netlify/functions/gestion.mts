@@ -1,31 +1,12 @@
 // /api/gestion — "Asesor FamiliSalud": la familia paga para que una persona del equipo haga un trámite con la EPS (sacar cita, radicar orden, pedir historia clínica u otro).
-// Flujo: pago (espera el pago) → proceso (pago recibido, gestionando) → lista (con fecha, hora y lugar) | no (no se pudo; se devuelve el dinero).
+// Flujo: pago → proceso (pago recibido) → [radicado (esperando respuesta de la EPS, con plazo legal)] → lista | no (se devuelve el dinero).
 import type { Config } from "@netlify/functions";
 import { requireUser, isAdmin, stores, json, resolveFamily, PRECIOS } from "../../lib/common.mts";
-import { vapidKeys, sendPush, pushStore, type Sub } from "../../lib/push.mts";
+import { SERVICIOS, avisar, txt, plazoRespuesta, type Estado, type Servicio, type Gestion } from "../../lib/gestiones.mts";
 
-type Estado = "pago" | "proceso" | "lista" | "no";
-type Servicio = "cita" | "radicar" | "historia" | "otro";
-const SERVICIOS: Record<Servicio, string> = { cita: "Sacar una cita", radicar: "Radicar una orden o autorización", historia: "Pedir la historia clínica", otro: "Otro trámite con la EPS" };
-type Gestion = {
-  id: string; famId: string; userId: string; email: string; creada: string; actualizada: string; estado: Estado; precio: number; servicio: Servicio;
-  persona: { id: string; nombre: string; tipoDoc: string; doc: string; eps: string; regimen: string; nac: string };
-  que: string; ciudad: string; disponibilidad: string; telefono: string; notas: string; tieneFoto: boolean;
-  resultado?: { fecha: string; hora: string; lugar: string; notas: string } | null; nota?: string; agregada?: boolean;
-};
-
-const txt = (v: unknown, n: number) => String(v ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n);
 const nuevoId = () => { const b = new Uint8Array(9); crypto.getRandomValues(b); return Array.from(b, x => x.toString(16).padStart(2, "0")).join(""); };
 const publica = (g: Gestion) => g; // la familia ve todo lo suyo; la foto se pide aparte
-
-async function avisar(userIds: string[], data: unknown) {
-  if (!vapidKeys()) return;
-  const ps = await pushStore();
-  for (const id of userIds) {
-    const reg = ((await ps.get(id, { type: "json" })) as { subs: Sub[] } | null) || { subs: [] };
-    for (const sub of reg.subs) { try { await sendPush(sub, data, { ttl: 24 * 3600, urgency: "high" }); } catch (e: any) { console.error("[gestion] push", e?.message); } }
-  }
-}
+const fechaCO = (iso: string) => new Date(iso).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Bogota" });
 
 export default async (req: Request) => {
   const user = await requireUser();
@@ -42,7 +23,7 @@ export default async (req: Request) => {
       if (foto) { const f = await gs.get(`foto/${foto}`, { type: "json" }) as { media_type: string; data: string } | null; return f ? json(f) : json({ error: "Sin foto." }, 404); }
       const { blobs } = await gs.list({ prefix: "g/" });
       const all = (await Promise.all(blobs.map(b => gs.get(b.key, { type: "json" })))).filter(Boolean) as Gestion[];
-      const orden: Record<Estado, number> = { proceso: 0, pago: 1, lista: 2, no: 3 };
+      const orden: Record<Estado, number> = { proceso: 0, pago: 1, radicado: 2, lista: 3, no: 4 };
       all.sort((a, b) => orden[a.estado] - orden[b.estado] || b.creada.localeCompare(a.creada));
       return json({ gestiones: all.slice(0, 150) });
     }
@@ -52,13 +33,21 @@ export default async (req: Request) => {
       const g = (await gs.get(key, { type: "json" })) as Gestion | null;
       if (!g) return json({ error: "Solicitud no encontrada." }, 404);
       const estado = body.estado as Estado;
-      if (!["pago", "proceso", "lista", "no"].includes(estado)) return json({ error: "Estado inválido." }, 400);
+      if (!["pago", "proceso", "radicado", "lista", "no"].includes(estado)) return json({ error: "Estado inválido." }, 400);
+      if (estado === "radicado") {
+        const numero = txt(body.radicado?.numero, 60);
+        if (!numero) return json({ error: "Escribe el número de radicado que dio la EPS." }, 400);
+        const p = plazoRespuesta(g.persona.nac);
+        g.radicado = { numero, fecha: new Date().toISOString(), limite: p.limite, mayor: p.mayor };
+      }
       if (estado === "lista") {
         const r = body.resultado || {};
+        const a = r.autorizacion || null;
+        const aut = a && (txt(a.numero, 60) || txt(a.servicio, 160)) ? { numero: txt(a.numero, 60), servicio: txt(a.servicio, 160) || g.que, prestador: txt(a.prestador, 160), direccion: txt(a.direccion, 200), vence: /^\d{4}-\d{2}-\d{2}$/.test(String(a.vence || "")) ? a.vence : "" } : null;
         const conFecha = /^\d{4}-\d{2}-\d{2}$/.test(String(r.fecha || ""));
         if ((g.servicio || "cita") === "cita" && !conFecha) return json({ error: "Escribe la fecha de la cita." }, 400);
-        if ((g.servicio || "cita") !== "cita" && !conFecha && !txt(r.notas, 500)) return json({ error: "Escribe el resultado para la familia (por ejemplo, el número de radicado)." }, 400);
-        g.resultado = { fecha: conFecha ? r.fecha : "", hora: /^\d{2}:\d{2}$/.test(String(r.hora || "")) ? r.hora : "", lugar: txt(r.lugar, 200), notas: txt(r.notas, 500) };
+        if ((g.servicio || "cita") !== "cita" && !conFecha && !aut && !txt(r.notas, 500)) return json({ error: "Escribe el resultado para la familia (por ejemplo, el número de radicado)." }, 400);
+        g.resultado = { fecha: conFecha ? r.fecha : "", hora: /^\d{2}:\d{2}$/.test(String(r.hora || "")) ? r.hora : "", lugar: txt(r.lugar, 200), notas: txt(r.notas, 500), autorizacion: aut, aprobada: typeof r.aprobada === "boolean" ? r.aprobada : aut ? true : null };
       }
       if (estado === "no") g.nota = txt(body.nota, 500) || "No fue posible completar el trámite. Te devolvemos el dinero.";
       g.estado = estado; g.actualizada = new Date().toISOString();
@@ -68,7 +57,10 @@ export default async (req: Request) => {
       const ids = fam ? fam.miembros.map(m => m.userId) : [g.userId];
       const nombre = g.persona.nombre.split(" ")[0];
       const esCita = (g.servicio || "cita") === "cita";
-      const msg = estado === "lista" ? (esCita ? { title: `¡Cita lista para ${nombre}!`, body: `${g.que}: ${g.resultado!.fecha}${g.resultado!.hora ? " a las " + g.resultado!.hora : ""}. Ábrela para agregarla a tu agenda.` }
+      const aut = g.resultado?.autorizacion;
+      const msg = estado === "radicado" ? { title: `Orden radicada · ${nombre}`, body: `Radicado N.° ${g.radicado!.numero}. La EPS debe responder a más tardar el ${fechaCO(g.radicado!.limite)}. Te avisamos.` }
+        : estado === "lista" && aut ? { title: `¡Autorización aprobada para ${nombre}!`, body: `${aut.servicio}${aut.prestador ? " en " + aut.prestador : ""}${aut.vence ? ". Vence el " + aut.vence : ""}. Ábrela para guardarla.`.slice(0, 200) }
+        : estado === "lista" ? (esCita ? { title: `¡Cita lista para ${nombre}!`, body: `${g.que}: ${g.resultado!.fecha}${g.resultado!.hora ? " a las " + g.resultado!.hora : ""}. Ábrela para agregarla a tu agenda.` }
           : { title: `Trámite listo para ${nombre}`, body: `${SERVICIOS[g.servicio]}: ${g.resultado!.notas || "listo"}`.slice(0, 180) })
         : estado === "proceso" ? { title: "Recibimos tu pago", body: `Un asesor ya está haciendo el trámite (${SERVICIOS[g.servicio || "cita"].toLowerCase()}) para ${nombre}.` }
         : estado === "no" ? { title: esCita ? "No pudimos conseguir la cita" : "No pudimos completar el trámite", body: g.nota! } : null;
@@ -101,6 +93,7 @@ export default async (req: Request) => {
       id: nuevoId(), famId: fam.id, userId: user.id, email: user.email || "", creada: new Date().toISOString(), actualizada: new Date().toISOString(), estado: "pago", precio: PRECIOS.gestion, servicio,
       persona: { id: txt(p.id, 40), nombre: txt(p.nombre, 100), tipoDoc: txt(p.tipoDoc, 10), doc: txt(p.doc, 20), eps: txt(p.eps, 80), regimen: txt(p.regimen, 20), nac: txt(p.nac, 10) },
       que: txt(body.que, 120), ciudad: txt(body.ciudad, 80), disponibilidad: txt(body.disponibilidad, 200), telefono: txt(body.telefono, 20), notas: txt(body.notas, 500), tieneFoto: false,
+      lectura: body.lectura && typeof body.lectura === "object" ? Object.fromEntries(Object.entries(body.lectura).slice(0, 14).map(([k, v]) => [txt(k, 20), typeof v === "boolean" || v === null ? v : txt(v, 200)])) : null,
     };
     if (!g.persona.nombre || !g.que) return json({ error: "Dinos para quién es y qué necesitas." }, 400);
     if (servicio === "radicar" && !(body.foto && typeof body.foto.data === "string")) return json({ error: "Para radicar necesitamos la foto de la orden médica." }, 400);

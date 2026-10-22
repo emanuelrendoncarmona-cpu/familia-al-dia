@@ -371,7 +371,52 @@ const GEST_SERV = {
   otro: { t: 'Otro trámite con la EPS', sub: 'Medicamentos pendientes, MIPRES, cambio de IPS, quejas y más.', que: '¿Qué trámite necesitas?', ph: 'Ej.: no me entregan un medicamento', lugar: 'Ciudad', disp: false, foto: 'Foto de algún documento relacionado (opcional)' },
 };
 const servDe = g => GEST_SERV[g.servicio] ? g.servicio : 'cita';
-const GEST_TXT = { pago: ['Esperando tu pago', 'warn'], proceso: ['Un asesor lo está haciendo', 'accent'], lista: ['¡Listo!', 'good'], no: ['No se pudo', 'crit'] };
+const radVencido = g => g.estado === 'radicado' && g.radicado && Date.now() > Date.parse(g.radicado.limite);
+const fechaDe = iso => isoLocal(new Date(iso));
+function lecturaHTML(l) {
+  if (!l) return '';
+  if (l.legible === false) return `<div class="notice full" style="margin:0;background:var(--crit-soft)"><span><b>La foto no se ve bien:</b> ${esc(l.motivo || 'tómala de nuevo, completa y con buena luz')}. Así la EPS te la puede rechazar.</span></div>`;
+  const it = [l.servicio && `<b>${esc(l.servicio)}</b>`, l.codigo && `código ${esc(l.codigo)}`, l.cantidad && `${esc(l.cantidad)} ${/^\d+$/.test(String(l.cantidad)) ? 'sesiones/unidades' : ''}`, l.especialidad && esc(l.especialidad), l.fecha && `del ${fmtDate(l.fecha)}`, l.prioritario && '<span class="badge crit">Prioritaria</span>'].filter(Boolean);
+  return `<div class="answer full" style="margin:0"><b style="color:var(--ai)">${ic('spark')} Leímos la orden</b><span class="small">${it.join(' · ') || 'Se ve bien.'}</span></div>`;
+}
+function epsMsg(g) {
+  const p = g.persona, sv = servDe(g), l = g.lectura || {};
+  const pac = `${p.nombre}, ${p.tipoDoc || 'CC'} ${p.doc}${p.regimen ? ', régimen ' + p.regimen : ''}`;
+  const mayor = p.nac && (new Date().getFullYear() - +p.nac.slice(0, 4)) >= 60;
+  if (sv === 'radicar') return `Buenos días. Solicito la autorización del servicio ordenado en la orden médica adjunta.\nPaciente: ${pac}.\nServicio: ${l.servicio || g.que}${l.codigo ? ' (CUPS ' + l.codigo + ')' : ''}${l.cantidad ? ', cantidad ' + l.cantidad : ''}.\n${l.medico ? 'Ordenado por: ' + l.medico + (l.fecha ? ', el ' + l.fecha : '') + '.\n' : ''}Celular de contacto: ${g.telefono}.\n${mayor ? 'Se trata de un adulto mayor: según la Circular Conjunta 019 de 2025, la respuesta debe darse en máximo 2 días hábiles.\n' : ''}Agradezco me informen el número de radicado. Gracias.`;
+  if (sv === 'cita') return `Buenos días. Solicito una cita de ${g.que} para ${pac}.${g.ciudad ? ' Sede o ciudad: ' + g.ciudad + '.' : ''}${g.disponibilidad ? ' Disponibilidad: ' + g.disponibilidad + '.' : ''} Celular de contacto: ${g.telefono}. Gracias.`;
+  if (sv === 'historia') return `Buenos días. Solicito copia de la historia clínica de ${pac}, atendido(a) en ${g.que}${g.ciudad ? ' (' + g.ciudad + ')' : ''}.${g.notas ? ' ' + g.notas : ''} Celular de contacto: ${g.telefono}. Gracias.`;
+  return `Buenos días. Escribo en nombre de ${pac}. ${g.que}.${g.notas ? ' ' + g.notas : ''} Celular de contacto: ${g.telefono}. Gracias.`;
+}
+function quejaTexto(g) {
+  const p = g.persona, r = g.radicado;
+  return `Señores ${p.eps}:\nEl ${fmtLong(fechaDe(r.fecha))} se radicó la solicitud de autorización N.° ${r.numero} para ${g.lectura && g.lectura.servicio || g.que}, del paciente ${p.nombre}, ${p.tipoDoc || 'CC'} ${p.doc}.\n${r.mayor ? 'Por tratarse de un adulto mayor, el plazo para responder era de 2 días hábiles' : 'El plazo para responder era de 5 días calendario'} (Circular Conjunta 019 de 2025 de MinSalud y Supersalud, y art. 125 del Decreto Ley 019 de 2012), es decir, hasta el ${fmtLong(fechaDe(r.limite))}, y a la fecha no hemos recibido respuesta.\nSolicito que se emita la autorización de inmediato y se informe en qué institución se prestará el servicio. Recuerdo que la gestión de autorizaciones no debe trasladarse al paciente.\nContacto: ${g.telefono}.`;
+}
+function openQuejaGest(id) {
+  const g = gest.find(x => x.id === id); if (!g || !g.radicado) return;
+  const e = epsOf({ eps: g.persona.eps }); const t = quejaTexto(g);
+  openDialog(`${head('Queja por radicado sin respuesta')}
+    <p style="margin:0">La EPS no respondió dentro del plazo legal. Envía esta queja (PQRD) por su canal oficial. Si en 5 días hábiles no responde, ponla ante la Superintendencia de Salud.</p>
+    <div class="answer" style="margin:0"><p class="small" style="white-space:pre-line;margin:0" id="qg-t">${esc(t)}</p><div class="row"><span class="grow"></span><button class="btn sm" id="qg-copy">${ic('copy')} Copiar</button></div></div>
+    <div class="chips">${e && e.more ? `<a class="btn sm" href="${esc(e.more)}" target="_blank" rel="noopener">Canales de ${esc(e.n)}</a>` : ''}${e && e.wa ? `<a class="btn sm" href="https://wa.me/${e.wa}?text=${encodeURIComponent(t)}" target="_blank" rel="noopener">${ic('send')} WhatsApp de la EPS</a>` : ''}<a class="btn sm" href="https://www.supersalud.gov.co" target="_blank" rel="noopener">Superintendencia de Salud</a></div>
+    ${mode === 'netlify' ? `<button class="card" id="qg-ase" style="text-align:left;gap:2px;border-color:var(--accent)"><b>Que el asesor ponga la queja</b><span class="small muted">Lo hacemos por ti y hacemos seguimiento. ${money(gestPrecio)}.</span></button>` : ''}`, r => {
+    r.querySelector('#qg-copy').onclick = () => copyText(t);
+    r.querySelector('#qg-ase')?.addEventListener('click', () => openGestion({ servicio: 'otro', miembroId: g.persona.id, que: `Queja: radicado N.° ${g.radicado.numero} sin respuesta` }));
+  });
+}
+function guardarAut(id) {
+  const g = gest.find(x => x.id === id); const a = g && g.resultado && g.resultado.autorizacion; if (!a) return;
+  const mid = member(g.persona.id) ? g.persona.id : (S.miembros.find(m => m.nombre === g.persona.nombre) || S.miembros[0]).id;
+  const aut = { id: uid(), estado: 'vigente', miembroId: mid, numero: a.numero, servicio: a.servicio + (a.prestador ? ' · ' + a.prestador : ''), exp: todayISO(), vence: a.vence || '' };
+  S.auts.push(aut); persist(); g.agregada = true; gestPost({ accion: 'agregada', id }).catch(() => {});
+  openDialog(`${head('Autorización guardada')}
+    <p style="margin:0">La guardamos en Salud > Órdenes${a.vence ? ` y te avisamos antes de que venza (${fmtLong(a.vence)})` : ''}. Ahora falta pedir la cita${a.prestador ? ' en <b>' + esc(a.prestador) + '</b>' : ''}.</p>
+    <div class="dlg-foot"><button class="btn" id="ga-yo">La pido yo</button><button class="btn primary" id="ga-ase">Que el asesor la saque</button></div>`, r => {
+    r.querySelector('#ga-yo').onclick = () => openPedir({ miembroId: mid, que: a.servicio, especialidad: a.servicio, numero: a.numero, autId: aut.id });
+    r.querySelector('#ga-ase').onclick = () => openGestion({ servicio: 'cita', miembroId: mid, que: `${a.servicio}${a.prestador ? ' en ' + a.prestador : ''} (autorización ${a.numero || 'aprobada'})` });
+  });
+}
+const GEST_TXT = { pago: ['Esperando tu pago', 'warn'], proceso: ['Un asesor lo está haciendo', 'accent'], radicado: ['Radicado: esperando a la EPS', 'accent'], lista: ['¡Listo!', 'good'], no: ['No se pudo', 'crit'] };
 const DEMO_MSG = 'Estás viendo la familia de ejemplo: no hay datos tuyos para exportar. Toca “Empezar con la mía” para agregar tu familia.';
 const aiOn = () => !!sampleApi || mode === 'netlify';
 const photoOn = () => sampleImages || mode === 'netlify';
@@ -657,7 +702,9 @@ function alerts() {
   });
   gest.forEach(g => {
     const esCita = servDe(g) === 'cita';
-    if (g.estado === 'lista' && !g.agregada && esCita) out.push({ lvl: 'warn', k: 'check', title: `¡Te sacamos la cita! ${g.que} · ${first({ nombre: g.persona.nombre })}`, sub: `${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}. Agrégala a tu agenda.`, act: ['Ver', () => openGestDetail(g.id)], top: true });
+    if (radVencido(g)) out.push({ lvl: 'crit', k: 'alert', title: `La EPS no respondió el radicado · ${g.que}`, sub: `Se venció el plazo el ${fmtDate(fechaDe(g.radicado.limite))}. La queja ya está lista.`, act: ['Poner queja', () => openQuejaGest(g.id)], top: true });
+    else if (g.estado === 'lista' && !g.agregada && g.resultado && g.resultado.autorizacion) out.push({ lvl: 'warn', k: 'check', title: `¡Autorización aprobada! ${g.resultado.autorizacion.servicio}`, sub: `${first({ nombre: g.persona.nombre })}${g.resultado.autorizacion.vence ? ' · vence el ' + fmtDate(g.resultado.autorizacion.vence) : ''}. Guárdala y pide la cita.`, act: ['Guardar', () => guardarAut(g.id)], top: true });
+    else if (g.estado === 'lista' && !g.agregada && esCita) out.push({ lvl: 'warn', k: 'check', title: `¡Te sacamos la cita! ${g.que} · ${first({ nombre: g.persona.nombre })}`, sub: `${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}. Agrégala a tu agenda.`, act: ['Ver', () => openGestDetail(g.id)], top: true });
     else if (g.estado === 'lista' && !g.agregada && !esCita) out.push({ lvl: 'info', k: 'check', title: `Trámite listo · ${g.que}`, sub: (g.resultado && g.resultado.notas) || 'Mira el resultado.', act: ['Ver', () => openGestDetail(g.id)], top: true });
     else if (g.estado === 'pago') out.push({ lvl: 'info', k: 'clock', title: `Falta tu pago · ${esCita ? 'cita de ' : ''}${g.que}`, sub: `Paga ${money(g.precio)} para que el asesor empiece.`, act: ['Pagar', () => openGestDetail(g.id)], top: true });
     else if (g.estado === 'no') out.push({ lvl: 'warn', k: 'alert', title: `No pudimos completar: ${g.que}`, sub: 'Te devolvemos el dinero. Mira las opciones.', act: ['Ver', () => openGestDetail(g.id)], top: true });
@@ -1329,7 +1376,7 @@ function gestCardHTML(g) {
   const [t, cls] = GEST_TXT[g.estado] || ['', ''];
   const sv = servDe(g);
   return `<button class="card" data-gest="${esc(g.id)}" style="gap:4px;${g.estado === 'lista' && !g.agregada ? 'border-color:var(--good)' : ''}"><span class="row"><b class="grow">${sv === 'cita' ? '' : esc(GEST_SERV[sv].t) + ': '}${esc(g.que)} · ${esc(first({ nombre: g.persona.nombre }))}</b><span class="badge ${cls}">${t}</span></span>
-    <span class="small muted">${g.estado === 'lista' && g.resultado && !g.resultado.fecha ? esc(g.resultado.notas || 'Trámite listo') : g.estado === 'lista' && g.resultado ? `${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}${g.resultado.lugar ? ' · ' + esc(g.resultado.lugar) : ''}` : g.estado === 'pago' ? `Paga ${money(g.precio)} para que empecemos` : g.estado === 'proceso' ? 'Te avisamos apenas esté listo' : esc(g.nota || '')}</span></button>`;
+    <span class="small muted">${g.estado === 'lista' && g.resultado && !g.resultado.fecha ? esc(g.resultado.notas || 'Trámite listo') : g.estado === 'lista' && g.resultado ? `${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}${g.resultado.lugar ? ' · ' + esc(g.resultado.lugar) : ''}` : g.estado === 'pago' ? `Paga ${money(g.precio)} para que empecemos` : g.estado === 'radicado' ? (radVencido(g) ? '<span style="color:var(--crit)">La EPS no respondió a tiempo: pon la queja</span>' : `N.° ${esc(g.radicado.numero)} · la EPS responde a más tardar el ${fmtDate(fechaDe(g.radicado.limite))}`) : g.estado === 'lista' && g.resultado && g.resultado.autorizacion && !g.agregada ? 'Autorización aprobada: guárdala' : g.estado === 'proceso' ? 'Te avisamos apenas esté listo' : esc(g.nota || '')}</span></button>`;
 }
 function gestListHTML() {
   if (mode !== 'netlify') return '';
@@ -1340,7 +1387,7 @@ function openGestion(pre = {}) {
   if (mode !== 'netlify') { toast('Este servicio necesita una cuenta.'); return; }
   if (!S.miembros.length) { openMember(); return; }
   if (rol === 'lector') { toast('Tienes acceso solo para ver. Pide a quien administra la familia que haga la solicitud.'); return; }
-  let mid = pre.miembroId || S.miembros[0].id, foto = null, sv = GEST_SERV[pre.servicio] ? pre.servicio : null;
+  let mid = pre.miembroId || S.miembros[0].id, foto = null, lectura = null, sv = GEST_SERV[pre.servicio] ? pre.servicio : null;
   if (!sv) {
     openDialog(`${head('Ayuda de un asesor')}
       <p style="margin:0">Una persona de nuestro equipo hace el trámite con la EPS por ti. Solo dinos qué necesitas.</p>
@@ -1366,6 +1413,7 @@ function openGestion(pre = {}) {
         ${X.disp ? `<label class="f">¿Cuándo puede ir?<input id="gs-disp" value="${esc(keep.disp || '')}" placeholder="Ej.: mañanas entre semana, cualquier día"></label>` : ''}
         <label class="f">Celular de contacto (WhatsApp)<input id="gs-tel" required inputmode="tel" value="${esc(keep.tel ?? tel)}" placeholder="300 123 4567"></label>
         <label class="f full">${esc(X.foto)}<input type="file" id="gs-foto" accept="image/*"></label>
+        <div id="gs-lec" class="full" style="display:grid">${lecturaHTML(lectura)}</div>
         <label class="f full">Algo más que debamos saber (opcional)<textarea id="gs-notas" placeholder="Ej.: es control de un examen, prefiere doctora, la EPS dice que no hay agenda…">${esc(keep.notas || '')}</textarea></label>
         <label class="row full small" style="gap:8px;align-items:flex-start"><input type="checkbox" id="gs-ok" style="margin-top:3px"><span>Autorizo a Emnova (FamiliSalud) a usar estos datos para hacer este trámite ante la EPS o la institución de salud en nombre de esta persona, según la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a>.</span></label>
         <div class="dlg-foot full"><button class="btn" type="button" id="gs-x">Cancelar</button><button class="btn primary" type="submit" ${falta(m) ? 'disabled' : ''}>Pedir ayuda del asesor</button></div>
@@ -1374,7 +1422,16 @@ function openGestion(pre = {}) {
       r.querySelector('#gs-m').onchange = e => { const k = keepNow(); mid = e.target.value; draw(k); };
       r.querySelector('#gs-x').onclick = () => dlg.close();
       r.querySelector('#gs-edit')?.addEventListener('click', () => openMember(mid));
-      r.querySelector('#gs-foto').onchange = async e => { const f = e.target.files[0]; foto = null; if (!f) return; try { foto = await shrinkImage(f, 1400); } catch (_) { toast('No se pudo leer la foto.'); } };
+      r.querySelector('#gs-foto').onchange = async e => {
+        const f = e.target.files[0]; foto = null; lectura = null; const box = r.querySelector('#gs-lec'); box.innerHTML = ''; if (!f) return;
+        try { foto = await shrinkImage(f, 1400); } catch (_) { toast('No se pudo leer la foto.'); return; }
+        if (!aiOn() || (sv !== 'radicar' && sv !== 'cita')) return;
+        box.innerHTML = `<span class="small muted">${ic('spark')} Revisando la orden…</span>`;
+        try {
+          lectura = await aiCall({ mode: 'orden', image: foto }); box.innerHTML = lecturaHTML(lectura);
+          const q = r.querySelector('#gs-que'); if (q && !q.value.trim() && lectura.legible !== false) q.value = (sv === 'cita' ? lectura.especialidad || lectura.servicio : lectura.servicio) || '';
+        } catch (_) { box.innerHTML = ''; }
+      };
       r.querySelector('#gs-f').onsubmit = async e => {
         e.preventDefault();
         if (!r.querySelector('#gs-ok').checked) { toast('Marca la autorización para continuar.'); return; }
@@ -1382,7 +1439,7 @@ function openGestion(pre = {}) {
         const m = member(mid), btn = r.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Enviando…';
         try { localStorage.setItem('fs-tel', val(r, 'gs-tel')); } catch (_) {}
         try {
-          const j = await gestPost({ accion: 'crear', servicio: sv, persona: { id: m.id, nombre: m.nombre, tipoDoc: m.tipoDoc || 'CC', doc: m.doc, eps: m.eps, regimen: m.regimen || '', nac: m.nac || '' }, que: val(r, 'gs-que'), ciudad: val(r, 'gs-ciudad'), disponibilidad: r.querySelector('#gs-disp') ? val(r, 'gs-disp') : '', telefono: val(r, 'gs-tel'), notas: val(r, 'gs-notas'), autoriza: true, foto });
+          const j = await gestPost({ accion: 'crear', servicio: sv, persona: { id: m.id, nombre: m.nombre, tipoDoc: m.tipoDoc || 'CC', doc: m.doc, eps: m.eps, regimen: m.regimen || '', nac: m.nac || '' }, que: val(r, 'gs-que'), ciudad: val(r, 'gs-ciudad'), disponibilidad: r.querySelector('#gs-disp') ? val(r, 'gs-disp') : '', telefono: val(r, 'gs-tel'), notas: val(r, 'gs-notas'), autoriza: true, lectura, foto });
           gest.unshift(j.gestion); openGestDetail(j.gestion.id, true);
         } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = 'Pedir ayuda del asesor'; }
       };
@@ -1402,6 +1459,11 @@ function openGestDetail(id, nueva) {
       <div class="card" style="gap:10px;border-color:var(--accent)">${payBoxHTML(g.precio, PLAN.qrGestion, 'familisalud-cita')}<span class="chips">${PAGO.whatsapp ? `<a class="btn sm" href="https://wa.me/${esc(PAGO.whatsapp)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('share')} Comprobante por WhatsApp</a>` : ''}<a class="btn sm" href="mailto:${PAGO.correo}?subject=${encodeURIComponent('Pago asesor FamiliSalud')}&body=${encodeURIComponent(msg)}">Comprobante por correo</a></span></div>
       <div class="dlg-foot"><button class="btn danger" id="gd-cancel">Cancelar solicitud</button><button class="btn primary" id="gd-ok">Listo</button></div>`
     : g.estado === 'proceso' ? `<p style="margin:0">Recibimos tu pago y un asesor ya está haciendo el trámite. Te llega una notificación cuando esté listo${pushState.on ? '' : ' (activa los recordatorios en Familia > Ajustes para recibirla)'}.</p><div class="dlg-foot"><button class="btn primary" id="gd-ok">Entendido</button></div>`
+    : g.estado === 'radicado' ? `<div class="answer" style="margin:0"><b style="color:var(--ai)">Radicado N.° ${esc(g.radicado.numero)}</b><span class="small">Se radicó el ${fmtLong(fechaDe(g.radicado.fecha))}. La EPS debe responder a más tardar el <b>${fmtLong(fechaDe(g.radicado.limite))}</b> (${g.radicado.mayor ? '2 días hábiles por ser adulto mayor' : '5 días calendario'}).</span></div>
+      ${radVencido(g) ? `<div class="notice" style="margin:0;background:var(--crit-soft)"><span><b>Ya pasó el plazo y la EPS no ha respondido.</b> Tienes derecho a poner una queja.</span><button class="btn sm primary" id="gd-queja">Poner queja</button></div>` : '<p class="small muted" style="margin:0">Hacemos seguimiento y te avisamos apenas responda. Si se vence el plazo, te dejamos la queja lista.</p>'}
+      <div class="dlg-foot"><button class="btn primary" id="gd-ok">Entendido</button></div>`
+    : g.estado === 'lista' && g.resultado && g.resultado.autorizacion ? `<div class="answer" style="margin:0"><b style="color:var(--good)">${ic('check')} Autorización aprobada</b><span class="small"><b>${esc(g.resultado.autorizacion.servicio)}</b>${g.resultado.autorizacion.numero ? ' · N.° ' + esc(g.resultado.autorizacion.numero) : ''}</span>${g.resultado.autorizacion.prestador ? `<span class="small">Dónde: ${esc(g.resultado.autorizacion.prestador)}${g.resultado.autorizacion.direccion ? ', ' + esc(g.resultado.autorizacion.direccion) : ''}</span>` : ''}${g.resultado.autorizacion.vence ? `<span class="small">Vence el ${fmtLong(g.resultado.autorizacion.vence)}</span>` : ''}${g.resultado.notas ? `<span class="small">${esc(g.resultado.notas)}</span>` : ''}</div>
+      <div class="dlg-foot">${g.agregada ? '<button class="btn" id="gd-hide">Quitar de la lista</button><button class="btn primary" id="gd-ok">Ya está guardada</button>' : `<button class="btn primary" id="gd-aut">${ic('plus')} Guardar autorización</button>`}</div>`
     : g.estado === 'lista' && !esCita ? `<div class="answer" style="margin:0"><b style="color:var(--good)">${ic('check')} Trámite listo</b>${g.resultado && g.resultado.fecha ? `<p style="margin:4px 0 0">${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}</p>` : ''}${g.resultado && g.resultado.notas ? `<p style="margin:4px 0 0">${esc(g.resultado.notas)}</p>` : ''}${g.resultado && g.resultado.lugar ? `<p class="small" style="margin:4px 0 0">${esc(g.resultado.lugar)}</p>` : ''}</div>
       <div class="dlg-foot"><button class="btn" id="gd-hide">Quitar de la lista</button>${g.resultado && g.resultado.fecha ? `<button class="btn primary" id="gd-add">${ic('plus')} Agregar a mi agenda</button>` : '<button class="btn primary" id="gd-ok">Entendido</button>'}</div>`
     : g.estado === 'lista' ? `<div class="answer" style="margin:0"><b style="color:var(--good)">${ic('check')} ${fmtLong(g.resultado.fecha)}${g.resultado.hora ? ' · ' + fmtHora(g.resultado.hora) : ''}</b>${g.resultado.lugar ? `<p style="margin:4px 0 0">${esc(g.resultado.lugar)}</p>` : ''}${g.resultado.notas ? `<p class="small" style="margin:4px 0 0">${esc(g.resultado.notas)}</p>` : ''}</div>
@@ -1411,6 +1473,8 @@ function openGestDetail(id, nueva) {
     r.querySelector('#gd-ok')?.addEventListener('click', () => { dlg.close(); if (nueva) { view = 'salud'; salud = 'tramites'; render(); } });
     r.querySelector('#gd-cancel')?.addEventListener('click', () => openConfirm('¿Cancelar la solicitud?', 'Si ya pagaste, escríbenos antes de cancelar.', 'Cancelar solicitud', async () => { try { await gestPost({ accion: 'cancelar', id: g.id }); gest = gest.filter(x => x.id !== g.id); render(); toast('Solicitud cancelada'); } catch (e) { toast(e.message); } }));
     r.querySelector('#gd-hide')?.addEventListener('click', async () => { try { await gestPost({ accion: 'ocultar', id: g.id }); gest = gest.filter(x => x.id !== g.id); dlg.close(); render(); } catch (e) { toast(e.message); } });
+    r.querySelector('#gd-queja')?.addEventListener('click', () => openQuejaGest(g.id));
+    r.querySelector('#gd-aut')?.addEventListener('click', () => guardarAut(g.id));
     r.querySelector('#gd-self')?.addEventListener('click', () => openPedir({ miembroId: g.persona.id, que: g.que }));
     r.querySelector('#gd-add')?.addEventListener('click', () => {
       if (g.agregada) { dlg.close(); return; }
@@ -1497,26 +1561,39 @@ function adminGestiones(r) {
   const datos = g => `Trámite: ${GEST_SERV[servDe(g)].t}
 ${g.persona.nombre}\n${g.persona.tipoDoc} ${g.persona.doc}\nEPS: ${g.persona.eps}${g.persona.regimen ? ' (' + g.persona.regimen + ')' : ''}${g.persona.nac ? '\nNacimiento: ' + g.persona.nac : ''}\n${GEST_SERV[servDe(g)].que} ${g.que}\nCiudad/sede: ${g.ciudad || '—'}\nDisponibilidad: ${g.disponibilidad || '—'}\nContacto: ${g.telefono}${g.notas ? '\nNotas: ' + g.notas : ''}`;
   const card = g => { const [t, cls] = GEST_TXT[g.estado]; const tel = g.telefono.replace(/\D/g, ''); const wa = tel.length === 10 ? '57' + tel : tel;
-    const esCita = servDe(g) === 'cita';
+    const esCita = servDe(g) === 'cita', esRad = servDe(g) === 'radicar', e = epsOf({ eps: g.persona.eps });
     return `<div class="card" style="gap:8px" data-gk="${esc(g.famId)}|${esc(g.id)}"><div class="row"><b class="grow">${esCita ? '' : esc(GEST_SERV[servDe(g)].t) + ': '}${esc(g.que)} · ${esc(g.persona.nombre)}</b><span class="badge ${cls}">${t}</span></div>
       <span class="small" style="white-space:pre-line">${esc(datos(g))}\nCuenta: ${esc(g.email)} · pedida el ${fmtDate(g.creada.slice(0, 10))} · ${money(g.precio)}</span>
-      ${g.resultado && g.estado === 'lista' ? `<span class="small"><b>Resultado:</b> ${g.resultado.fecha ? fmtLong(g.resultado.fecha) + ' ' + (g.resultado.hora ? fmtHora(g.resultado.hora) : '') + ' · ' : ''}${esc(g.resultado.lugar || '')} ${esc(g.resultado.notas || '')}</span>` : ''}
-      <div class="chips"><button class="btn sm" data-g="copiar">${ic('copy')} Copiar datos</button>${g.tieneFoto && g.estado !== 'lista' && g.estado !== 'no' ? '<button class="btn sm" data-g="foto">Ver orden</button>' : ''}<a class="btn sm" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a><a class="btn sm" href="tel:${esc(g.telefono)}">Llamar</a></div>
-      <div class="chips">${g.estado === 'pago' ? '<button class="btn sm primary" data-g="proceso">Pago recibido: empezar</button>' : ''}${g.estado === 'proceso' || g.estado === 'pago' ? `<button class="btn sm primary" data-g="abrir-lista">${esCita ? 'Cita conseguida' : 'Trámite listo'}</button><button class="btn sm danger" data-g="abrir-no">No se pudo</button>` : ''}</div>
+      ${g.lectura ? `<div style="display:grid">${lecturaHTML(g.lectura)}</div>` : ''}
+      ${g.radicado ? `<span class="small"><b>Radicado N.° ${esc(g.radicado.numero)}</b> el ${fmtDate(fechaDe(g.radicado.fecha))} · plazo hasta el ${fmtDate(fechaDe(g.radicado.limite))}${radVencido(g) ? ' <span class="badge crit">Vencido</span>' : ''}</span>` : ''}
+      ${g.resultado && g.estado === 'lista' ? `<span class="small"><b>Resultado:</b>${g.resultado.autorizacion ? ` Autorización ${esc(g.resultado.autorizacion.numero || '')} · ${esc(g.resultado.autorizacion.servicio)} · ${esc(g.resultado.autorizacion.prestador || '')} · vence ${esc(g.resultado.autorizacion.vence || '—')}` : ''} ${g.resultado.fecha ? fmtLong(g.resultado.fecha) + ' ' + (g.resultado.hora ? fmtHora(g.resultado.hora) : '') + ' · ' : ''}${esc(g.resultado.lugar || '')} ${esc(g.resultado.notas || '')}</span>` : ''}
+      <div class="chips"><button class="btn sm" data-g="copiar">${ic('copy')} Copiar datos</button>${g.tieneFoto && g.estado !== 'lista' && g.estado !== 'no' ? '<button class="btn sm" data-g="foto">Ver orden</button>' : ''}<a class="btn sm" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp familia</a><a class="btn sm" href="tel:${esc(g.telefono)}">Llamar</a></div>
+      ${g.estado === 'proceso' || g.estado === 'radicado' ? `<div class="chips"><span class="small muted">${esc(e ? e.n : g.persona.eps)}:</span><button class="btn sm" data-g="msg">${ic('copy')} Copiar mensaje para la EPS</button>${e && e.web ? `<a class="btn sm" href="${esc(e.web[1])}" target="_blank" rel="noopener">${esc(e.web[0])}</a>` : ''}${e && e.wa ? `<a class="btn sm" href="https://wa.me/${e.wa}?text=${encodeURIComponent(epsMsg(g))}" target="_blank" rel="noopener">WhatsApp EPS</a>` : ''}${e && e.more ? `<a class="btn sm ghost" href="${esc(e.more)}" target="_blank" rel="noopener">Más canales</a>` : ''}</div>` : ''}
+      <div class="chips">${g.estado === 'pago' ? '<button class="btn sm primary" data-g="proceso">Pago recibido: empezar</button>' : ''}${esRad && g.estado === 'proceso' ? '<button class="btn sm primary" data-g="abrir-rad">Ya radiqué</button>' : ''}${esRad && g.estado === 'radicado' ? '<button class="btn sm primary" data-g="abrir-resp">Llegó la respuesta</button>' : ''}${!esRad && (g.estado === 'proceso' || g.estado === 'pago') ? `<button class="btn sm primary" data-g="abrir-lista">${esCita ? 'Cita conseguida' : 'Trámite listo'}</button>` : ''}${['pago', 'proceso', 'radicado'].includes(g.estado) ? `<button class="btn sm danger" data-g="abrir-no">${g.estado === 'radicado' ? 'Negada / no se pudo' : 'No se pudo'}</button>` : ''}</div>
+      ${abierto === g.id + 'rad' ? `<div class="fields"><label class="f full">N.° de radicado que dio la EPS<input id="ag-rad" placeholder="Ej.: 2026-1234567"></label><p class="small muted full" style="margin:0">La app calcula el plazo legal (${g.persona.nac && (new Date().getFullYear() - +g.persona.nac.slice(0, 4)) >= 60 ? '2 días hábiles: adulto mayor' : '5 días calendario'}), avisa a la familia y te recuerda si la EPS no responde.</p><button class="btn primary full" data-g="radicado">Guardar y avisar a la familia</button></div>` : ''}
+      ${abierto === g.id + 'resp' ? `<div class="fields"><label class="f full">Captura o foto de la respuesta de la EPS (la leemos por ti)<input type="file" id="ag-file" accept="image/*"></label><span class="small muted full" id="ag-st"></span><label class="f">N.° de autorización<input id="ag-an"></label><label class="f">Vence el<input type="date" id="ag-av"></label><label class="f full">Servicio<input id="ag-as" value="${esc(g.lectura && g.lectura.servicio || g.que)}"></label><label class="f full">Dónde se hace (IPS, laboratorio)<input id="ag-ap"></label><label class="f full">Dirección o teléfono<input id="ag-ad"></label><label class="f full">Nota para la familia (opcional)<input id="ag-notas"></label><button class="btn primary full" data-g="aprobada">Autorización aprobada: avisar a la familia</button></div>` : ''}
       ${abierto === g.id + 'lista' ? `<div class="fields"><label class="f">Fecha${esCita ? '' : ' (si aplica)'}<input type="date" id="ag-fecha"></label><label class="f">Hora<input type="time" id="ag-hora"></label><label class="f full">Lugar${esCita ? '' : ' (si aplica)'}<input id="ag-lugar" placeholder="Clínica, sede y consultorio"></label><label class="f full">${esCita ? 'Notas para la familia' : 'Resultado para la familia'}<input id="ag-notas" placeholder="${esCita ? 'Ej.: llegar 20 min antes con la orden' : 'Ej.: Radicado N.° 12345. La EPS responde en 5 días.'}"></label><button class="btn primary full" data-g="lista">Guardar y avisar a la familia</button></div>` : ''}
       ${abierto === g.id + 'no' ? `<div class="fields"><label class="f full">Mensaje para la familia<textarea id="ag-nota">${esCita ? 'No fue posible conseguir la cita porque la EPS no tiene agenda disponible.' : 'No fue posible completar el trámite.'} Te devolvemos el dinero.</textarea></label><button class="btn danger full" data-g="no">Guardar y avisar</button></div>` : ''}
     </div>`; };
-  const draw = () => { const n = G.filter(g => g.estado === 'pago' || g.estado === 'proceso').length; r.querySelector('#ad-gn').textContent = n ? `(${n})` : ''; box.innerHTML = G.length ? G.map(card).join('') : '<span class="muted">Aún no hay solicitudes.</span>'; };
+  const draw = () => { const n = G.filter(g => g.estado === 'pago' || g.estado === 'proceso' || radVencido(g)).length; r.querySelector('#ad-gn').textContent = n ? `(${n})` : ''; box.innerHTML = G.length ? G.map(card).join('') : '<span class="muted">Aún no hay solicitudes.</span>'; };
   const post = async (g, body) => { const res = await fetch('/api/gestion?admin=1', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(Object.assign({ famId: g.famId, id: g.id }, body)) }); const k = await res.json().catch(() => ({})); if (!res.ok) throw new Error(k.error || 'No se pudo guardar.'); Object.assign(g, k.gestion); };
   box.addEventListener('click', async e => {
     const b = e.target.closest('[data-g]'); if (!b) return; const [famId, id] = b.closest('[data-gk]').dataset.gk.split('|'); const g = G.find(x => x.id === id && x.famId === famId); const a = b.dataset.g;
     if (a === 'copiar') { copyText(datos(g)); return; }
     if (a === 'foto') { try { const res = await fetch(`/api/gestion?admin=1&foto=${encodeURIComponent(famId + '/' + id)}`, { credentials: 'same-origin' }); const f = await res.json(); if (!res.ok) throw new Error(f.error); const bin = atob(f.data), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); window.open(URL.createObjectURL(new Blob([arr], { type: f.media_type })), '_blank'); } catch (err) { toast(err.message || 'No se pudo abrir la foto.'); } return; }
-    if (a === 'abrir-lista' || a === 'abrir-no') { abierto = abierto === id + a.slice(6) ? null : id + a.slice(6); draw(); return; }
+    if (a === 'msg') { copyText(epsMsg(g)); return; }
+    if (a.startsWith('abrir-')) { abierto = abierto === id + a.slice(6) ? null : id + a.slice(6); draw(); const fi = box.querySelector('#ag-file'); if (fi) fi.onchange = async ev => {
+        const f = ev.target.files[0]; if (!f) return; const st = box.querySelector('#ag-st'); st.textContent = 'Leyendo la respuesta…';
+        try { const img = await shrinkImage(f, 1600); const x = await aiCall({ mode: 'respuesta', image: img }); const set = (k, v) => { const el = box.querySelector('#' + k); if (el && v) el.value = v; };
+          set('ag-an', x.numero_autorizacion); set('ag-av', /^\d{4}-\d{2}-\d{2}$/.test(x.vence || '') ? x.vence : ''); set('ag-as', x.servicio); set('ag-ap', x.prestador); set('ag-ad', [x.direccion, x.telefono].filter(Boolean).join(' · '));
+          st.textContent = x.aprobada === false ? `Parece NEGADA: ${x.motivo_negacion || 'revisa la respuesta'}. Si es así, usa "Negada / no se pudo".` : (x.resumen || 'Listo: revisa los datos antes de guardar.');
+        } catch (_) { st.textContent = 'No pudimos leerla. Llena los datos a mano.'; } }; return; }
     b.disabled = true; const old = b.textContent; b.textContent = 'Guardando…';
     try {
       if (a === 'proceso') await post(g, { estado: 'proceso' });
       if (a === 'lista') { const c = b.closest('.card'); await post(g, { estado: 'lista', resultado: { fecha: c.querySelector('#ag-fecha').value, hora: c.querySelector('#ag-hora').value, lugar: c.querySelector('#ag-lugar').value, notas: c.querySelector('#ag-notas').value } }); }
+      if (a === 'radicado') { const c = b.closest('.card'); await post(g, { estado: 'radicado', radicado: { numero: c.querySelector('#ag-rad').value } }); }
+      if (a === 'aprobada') { const c = b.closest('.card'); const v = k => c.querySelector('#' + k).value.trim(); await post(g, { estado: 'lista', resultado: { notas: v('ag-notas'), aprobada: true, autorizacion: { numero: v('ag-an'), vence: v('ag-av'), servicio: v('ag-as'), prestador: v('ag-ap'), direccion: v('ag-ad') } } }); }
       if (a === 'no') { const c = b.closest('.card'); await post(g, { estado: 'no', nota: c.querySelector('#ag-nota').value }); }
       abierto = null; toast('Guardado. Le avisamos a la familia.');
     } catch (err) { toast(err.message); b.textContent = old; b.disabled = false; return; }

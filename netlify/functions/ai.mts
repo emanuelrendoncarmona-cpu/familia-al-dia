@@ -2,7 +2,7 @@
 // Usa Netlify AI Gateway: no necesita clave propia; consume créditos de la cuenta de Netlify.
 import Anthropic from "@anthropic-ai/sdk";
 import type { Config } from "@netlify/functions";
-import { requireUser, getCuenta, estadoCuenta, stores, json, AI_DAILY_LIMIT, resolveFamily, gastarUso, USO_MES } from "../../lib/common.mts";
+import { requireUser, getCuenta, estadoCuenta, stores, json, AI_DAILY_LIMIT, resolveFamily, gastarUso, USO_MES, isAdmin } from "../../lib/common.mts";
 
 const MODEL = "claude-haiku-5-5";
 const TIPOS = "medica, odonto, examen, imagen, terapia, vacuna, colegio, tramite, otra";
@@ -19,7 +19,7 @@ Cómo funciona la app:
 - Conectar calendario: Ajustes > Conectar mi calendario > copiar enlace. En Google Calendar (computador): Otros calendarios > + > Desde URL > pegar. En iPhone: Ajustes > Calendario > Cuentas > Añadir cuenta > Otra > Añadir calendario suscrito. Google puede tardar varias horas en mostrar cambios.
 - Plan: 14 días gratis. Plan Familiar: $14.900 COP al mes o $149.000 al año, con personas ilimitadas (todos los integrantes y todos los que entran con su correo). Incluye uso justo del asistente: 150 consultas y 15 búsquedas de citas particulares al mes por familia. Plan Empresas a la medida (se pide desde Ajustes > Tu plan).
 - Invita y gana: en Ajustes > Invita a otra familia hay un enlace propio; cuando una familia que invitaste paga su plan, ganas 1 mes gratis.
-- Asesor FamiliSalud (personas reales): en Inicio "Un asesor lo hace por usted", o botón + > "Que un asesor lo haga por mí". Sirve para sacar una cita, radicar una orden o autorización (con foto de la orden), pedir la historia clínica u otro trámite con la EPS. Cuesta $19.900 por trámite, se paga con QR o llave de Nequi/Bre-B; te avisamos cuando esté listo. Si no se logra, te devolvemos el dinero. Se ve en Salud > Trámites.
+- Asesor FamiliSalud (personas reales): en Inicio "Un asesor lo hace por usted", o botón + > "Que un asesor lo haga por mí". Sirve para sacar una cita, radicar una orden o autorización (con foto de la orden), pedir la historia clínica u otro trámite con la EPS. Cuesta $19.900 por trámite, se paga con QR o llave de Nequi/Bre-B; te avisamos cuando esté listo. Si no se logra, te devolvemos el dinero. Se ve en Salud > Trámites. Al subir la foto de la orden, la app revisa que se vea bien y lee el servicio. Cuando se radica, la app muestra el número de radicado y la fecha límite de respuesta de la EPS; si la EPS no responde a tiempo, avisa y deja la queja lista. Cuando la autorización llega, se guarda con un toque y la app avisa antes de que venza.
 - Radicar órdenes: por la Circular Conjunta 019 de 2025, la clínica o la EPS deben tramitar las autorizaciones sin cargarle ese trámite al paciente; para adultos mayores la respuesta debe llegar en máximo 2 días hábiles. Hay una guía en Salud > Guías > "Me piden radicar la orden". Se paga por Nequi o Bre-B con QR o llave. Si vence, puedes ver y exportar tus datos pero no guardar cambios. Si lleva 12 meses vencido, se avisa y 30 días después se borra la información de la familia.
 - Privacidad: los datos se guardan cifrados en Netlify, solo tú los ves con tu cuenta. Responsable: Emnova (emanuelrendoncarmona@gmail.com).
 - Acceso familiar: en Familia > Quién tiene acceso, quien administra invita a cada integrante con su correo (puede editar o solo ver). La persona crea su cuenta con ese mismo correo y acepta la invitación. Todos ven la misma agenda.
@@ -51,7 +51,8 @@ export default async (req: Request) => {
   if (!fam) return json({ error: "Primero acepta o rechaza tu invitación familiar." }, 409);
   const owner = fam.miembros.find(m => m.userId === fam.ownerId) || { userId: fam.ownerId, email: "" };
   const estado = estadoCuenta(await getCuenta({ id: owner.userId, email: owner.email }));
-  if (!estado.activo) return json({ error: "Tu prueba gratis terminó. Activa tu plan para usar el asistente.", code: "plan_vencido" }, 402);
+  const esAdmin = isAdmin(user);
+  if (!estado.activo && !esAdmin) return json({ error: "Tu prueba gratis terminó. Activa tu plan para usar el asistente.", code: "plan_vencido" }, 402);
   if (!process.env.ANTHROPIC_BASE_URL && !process.env.ANTHROPIC_API_KEY) return json({ error: "El asistente se está actualizando. Intenta de nuevo en un minuto." }, 503);
   if (!(await checkQuota(user.id))) return json({ error: `Llegaste al límite de ${AI_DAILY_LIMIT} consultas de hoy. Mañana se renueva.`, code: "limite" }, 429);
 
@@ -59,7 +60,7 @@ export default async (req: Request) => {
   try { body = await req.json(); } catch { return json({ error: "Solicitud inválida." }, 400); }
   const mode = body.mode;
   const tipoUso = mode === "particular" ? "busqueda" : "asistente";
-  if (!(await gastarUso(fam.id, tipoUso))) return json({ error: tipoUso === "busqueda" ? `Tu familia ya usó las ${USO_MES.busqueda} búsquedas de citas particulares de este mes. El otro mes se renuevan.` : `Tu familia ya usó las ${USO_MES.asistente} consultas al asistente de este mes. El otro mes se renuevan; mientras tanto puedes llenar los formularios a mano.`, code: "limite_mes" }, 429);
+  if (!esAdmin && !(await gastarUso(fam.id, tipoUso))) return json({ error: tipoUso === "busqueda" ? `Tu familia ya usó las ${USO_MES.busqueda} búsquedas de citas particulares de este mes. El otro mes se renuevan.` : `Tu familia ya usó las ${USO_MES.asistente} consultas al asistente de este mes. El otro mes se renuevan; mientras tanto puedes llenar los formularios a mano.`, code: "limite_mes" }, 429);
   const hoy = String(body.hoy || new Date().toISOString().slice(0, 10)).slice(0, 30);
   const anthropic = new Anthropic();
 
@@ -102,6 +103,32 @@ Devuelve SOLO JSON: {"persona": nombre exacto de la lista o null, "tipo", "espec
       const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 4000, output_config: { effort: "low" }, messages: [{ role: "user", content }] });
       const out = msg.content.map((b: any) => (b.type === "text" ? b.text : "")).join("");
       return json(parseJSON(out));
+    }
+
+    if (mode === "orden" || mode === "respuesta") {
+      // Lee la foto de una orden médica (al pedir un trámite) o la respuesta de la EPS (el asesor, al cerrar un radicado).
+      if (!body.image || typeof body.image.data !== "string") return json({ error: "Falta la foto." }, 400);
+      if (body.image.data.length > 7_000_000) return json({ error: "La foto es muy pesada." }, 413);
+      const prompt = mode === "orden"
+        ? `Es la foto de un documento médico colombiano (orden médica, autorización o fórmula). Hoy es ${hoy}. Devuelve SOLO JSON:
+{"legible": true si se lee bien el servicio, el paciente y la firma o sello; false si está borrosa, cortada, oscura o no es un documento médico,
+"motivo": si no es legible, qué falta en máximo 12 palabras (ej. "la foto está cortada abajo, no se ve la firma"), si es legible null,
+"tipo": "orden" | "autorizacion" | "formula" | "otro",
+"servicio": servicio o examen ordenado en palabras simples (ej. "Resonancia magnética de rodilla derecha") o null,
+"codigo": código CUPS si aparece o null, "cantidad": número de sesiones o unidades si aplica o null,
+"especialidad": especialidad que la ordena o a la que remite o null, "diagnostico": diagnóstico en palabras simples o null,
+"medico": nombre del médico o null, "fecha": "YYYY-MM-DD" de expedición o null, "paciente": nombre del paciente o null,
+"prioritario": true si dice prioritario, urgente o similar}
+No inventes nada que no aparezca.`
+        : `Es una captura o foto de la respuesta de una EPS colombiana a una solicitud de autorización (correo, mensaje, portal o documento). Hoy es ${hoy}. Devuelve SOLO JSON:
+{"aprobada": true | false | null si no se sabe, "numero_autorizacion": string o null, "numero_radicado": string o null,
+"servicio": string o null, "prestador": clínica, laboratorio o IPS donde se debe hacer o null, "direccion": string o null, "telefono": string o null,
+"vence": "YYYY-MM-DD" fecha de vencimiento de la autorización o null, "motivo_negacion": si fue negada, por qué, o null,
+"resumen": una frase simple para la familia de máximo 25 palabras}
+No inventes nada que no aparezca.`;
+      const mt = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(body.image.media_type) ? body.image.media_type : "image/jpeg";
+      const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 3000, output_config: { effort: "low" }, messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: body.image.data } }, { type: "text", text: prompt }] }] } as any);
+      return json(parseJSON(msg.content.map((b: any) => (b.type === "text" ? b.text : "")).join("")));
     }
 
     if (mode === "particular") {
